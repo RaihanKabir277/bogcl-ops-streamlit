@@ -1,0 +1,5 @@
+streamlit==1.65.0
+databricks-sdk==0.152.0
+pandas>=2.1
+altair>=5.0
+pydeck>=0.9
