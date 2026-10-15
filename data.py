@@ -102,23 +102,31 @@ def q(sql: str, **params) -> pd.DataFrame:
 
 # --------------------------------------------------------------------------- dashboard queries
 def header() -> pd.DataFrame:
+    """Date, clock and the alert count shown in the top bar (same definition as the Databricks dashboard)."""
     return q("""
-        SELECT date_format(as_of_local, 'dd MMM yyyy')  AS today,
-               date_format(as_of_local, 'hh:mm a')      AS clock
-        FROM {fq}.gold_as_of""")
+        SELECT date_format(a.as_of_local, 'dd MMM yyyy')  AS today,
+               date_format(a.as_of_local, 'hh:mm a')      AS clock,
+               (SELECT count(*) FROM {fq}.alerts al
+                 WHERE al.severity IN ('Critical', 'Warning')
+                   AND al.event_ts >= a.as_of_utc - INTERVAL 24 HOURS) AS open_alerts
+        FROM {fq}.gold_as_of a""")
 
 
 def vessels() -> pd.DataFrame:
     """One row per vessel with its current voyage (gold_vessel_latest) + display columns."""
     return q("""
-        SELECT v.vessel_name, v.vessel_type, v.status, v.activity, v.lat, v.lon, v.speed_kn,
+        SELECT v.vessel_name, v.imo, v.vessel_type, v.status, v.activity, v.lat, v.lon, v.speed_kn,
                v.voyage_id, v.voyage_type, v.product, v.cargo_mt,
                v.origin_port, v.dest_port, v.from_port, v.to_port,
                v.distance_nm, v.distance_covered_nm, v.pct_covered, v.avg_speed_kn,
                date_format(from_utc_timestamp(v.eta, 'Asia/Dhaka'), 'dd MMM, hh:mm a')         AS eta_local,
                date_format(from_utc_timestamp(v.planned_eta, 'Asia/Dhaka'), 'dd MMM, hh:mm a') AS planned_eta_local,
-               round((unix_timestamp(v.eta) - unix_timestamp(a.as_of_utc)) / 3600, 1)         AS hours_to_arrival,
-               round((unix_timestamp(v.eta) - unix_timestamp(v.planned_eta)) / 3600, 1)       AS eta_slip_hrs
+               round((unix_timestamp(v.eta) - unix_timestamp(a.as_of_utc)) / 3600, 2)         AS hours_to_arrival,
+               round((unix_timestamp(v.eta) - unix_timestamp(v.planned_eta)) / 3600, 1)       AS eta_slip_hrs,
+               coalesce(v.status = 'En Route'
+                        AND to_date(from_utc_timestamp(v.eta, 'Asia/Dhaka')) = a.as_of_date, false) AS eta_today,
+               CASE WHEN v.status = 'At Anchor'
+                    THEN round((unix_timestamp(a.as_of_utc) - unix_timestamp(v.anchor_arrival_ts)) / 3600, 1) END AS anchor_wait_hrs
         FROM {fq}.gold_vessel_latest v CROSS JOIN {fq}.gold_as_of a
         ORDER BY v.vessel_name""")
 
@@ -142,8 +150,10 @@ def berths() -> pd.DataFrame:
     return q("""
         SELECT b.berth_id, d.berth_name, d.berth_type, p.port_name, b.status, v.vessel_name,
                date_format(from_utc_timestamp(b.since_ts, 'Asia/Dhaka'), 'dd MMM, hh:mm a') AS occupied_since,
+               round((unix_timestamp(a.as_of_utc) - unix_timestamp(b.since_ts)) / 3600, 1)  AS hours_at_berth,
                o.product, round(100 * o.transferred_mt / o.planned_mt, 0) AS discharge_pct
         FROM {fq}.silver_berth_latest b
+        CROSS JOIN {fq}.gold_as_of a
         JOIN {fq}.dim_berth d ON d.berth_id = b.berth_id
         JOIN {fq}.dim_port  p ON p.port_id  = b.port_id
         LEFT JOIN {fq}.dim_vessel v ON v.vessel_id = b.vessel_id
@@ -156,6 +166,17 @@ def bays() -> pd.DataFrame:
         SELECT count_if(status = 'Loading') AS busy, count_if(status = 'Maintenance') AS maintenance,
                count(*) AS total
         FROM {fq}.silver_bay_latest""")
+
+
+def turnaround() -> pd.DataFrame:
+    """Average hours from anchorage arrival to discharge completion, completed discharges in the last 7 days."""
+    return q("""
+        SELECT round(avg((unix_timestamp(o.end_ts) - unix_timestamp(v.anchor_arrival_ts)) / 3600), 1) AS turnaround_hrs,
+               count(*) AS vessels_handled_7d
+        FROM {fq}.silver_op_latest o
+        JOIN {fq}.silver_voyage_latest v ON v.voyage_id = o.voyage_id
+        CROSS JOIN {fq}.gold_as_of a
+        WHERE o.op_type = 'Discharge' AND o.status = 'Completed' AND o.end_ts >= a.as_of_utc - INTERVAL 7 DAYS""")
 
 
 def active_ops() -> pd.DataFrame:
@@ -179,6 +200,14 @@ def cargo_today() -> pd.DataFrame:
         WHERE to_date(from_utc_timestamp(f.event_ts, 'Asia/Dhaka')) = a.as_of_date""")
 
 
+def system_status() -> pd.DataFrame:
+    """Normal unless a Critical alert was raised in the last 2 hours (same rule as the Databricks dashboard)."""
+    return q("""
+        SELECT CASE WHEN count(*) = 0 THEN 'Normal' ELSE 'Attention' END AS system_status
+        FROM {fq}.alerts al CROSS JOIN {fq}.gold_as_of a
+        WHERE al.severity = 'Critical' AND al.event_ts >= a.as_of_utc - INTERVAL 2 HOURS""")
+
+
 def tanks() -> pd.DataFrame:
     return q("""
         SELECT tank_id, port_id, product, capacity_kl, volume_kl, level_pct, temperature_c
@@ -188,8 +217,9 @@ def tanks() -> pd.DataFrame:
 def kpis() -> pd.DataFrame:
     """Last 7 days + live today (gold_kpi_series)."""
     return q("""
-        SELECT date_format(kpi_date, 'yyyy-MM-dd') AS kpi_date, fleet_utilization_pct, cargo_delivered_mt,
-               on_time_pct, operational_delay_hrs, fuel_consumption_kl, critical_alerts, is_live
+        SELECT date_format(kpi_date, 'yyyy-MM-dd') AS kpi_date, date_format(kpi_date, 'dd MMM') AS kpi_label,
+               fleet_utilization_pct, cargo_delivered_mt, on_time_pct, operational_delay_hrs,
+               fuel_consumption_kl, critical_alerts, is_live
         FROM {fq}.gold_kpi_series
         WHERE kpi_date >= date_sub((SELECT as_of_date FROM {fq}.gold_as_of), 6)
         ORDER BY kpi_date""")
@@ -197,13 +227,16 @@ def kpis() -> pd.DataFrame:
 
 def alerts(limit: int = 60) -> pd.DataFrame:
     return q(f"""
-        SELECT date_format(from_utc_timestamp(event_ts, 'Asia/Dhaka'), 'dd MMM, hh:mm a') AS time_dhaka,
-               alert_id, severity, alert_type, asset_name, message
-        FROM {{fq}}.alerts ORDER BY event_ts DESC LIMIT {int(limit)}""")
+        SELECT date_format(from_utc_timestamp(al.event_ts, 'Asia/Dhaka'), 'dd MMM, hh:mm a') AS time_dhaka,
+               cast((unix_timestamp(a.as_of_utc) - unix_timestamp(al.event_ts)) / 60 AS INT) AS minutes_ago,
+               al.alert_id, al.severity, al.alert_type, al.asset_type, al.asset_name, al.message
+        FROM {{fq}}.alerts al CROSS JOIN {{fq}}.gold_as_of a
+        ORDER BY al.event_ts DESC LIMIT {int(limit)}""")
 
 
 def alert_counts() -> pd.DataFrame:
     return q("""
-        SELECT count_if(al.severity = 'Critical') AS critical_24h, count_if(al.severity = 'Warning') AS warning_24h
+        SELECT count_if(al.severity = 'Critical') AS critical_24h, count_if(al.severity = 'Warning') AS warning_24h,
+               count_if(al.severity = 'Info') AS info_24h
         FROM {fq}.alerts al CROSS JOIN {fq}.gold_as_of a
         WHERE al.event_ts >= a.as_of_utc - INTERVAL 24 HOURS""")
