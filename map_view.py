@@ -162,8 +162,10 @@ html[data-theme=light] .leaflet-container{background:#DDE6F0}
   function apply() {
     document.documentElement.setAttribute('data-theme', dark() ? 'dark' : 'light');
     if (tile) { map.removeLayer(tile); }
-    tile = L.tileLayer('https://{s}.basemaps.cartocdn.com/' + (dark() ? 'dark_all' : 'light_all') + '/{z}/{x}/{y}{r}.png',
-      {subdomains: 'abcd', maxZoom: 12, attribution: '&copy; OpenStreetMap contributors &copy; CARTO'}).addTo(map);
+    // Public OpenStreetMap tiles avoid a hosted-map API-key requirement.
+    // Keep visible attribution, as required by the tile provider.
+    tile = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      {subdomains: 'abc', maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'}).addTo(map);
     draw();
   }
 
