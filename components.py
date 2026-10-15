@@ -416,18 +416,31 @@ def _nice(x: float) -> float:
 
 
 def trend_card(k: pd.DataFrame | None) -> str:
-    if k is None or len(k) < 2:
-        return '<div class="bc bc-card"><div class="bc-ph"><span>KPI trend</span></div><div class="bc-note">Not enough history yet.</div></div>'
+    """Render a resilient seven-day SVG trend; tolerate null and non-numeric KPI values."""
+    required = ["kpi_label", "operational_delay_hrs", "on_time_pct", "fleet_utilization_pct"]
+    if k is None or k.empty or any(col not in k.columns for col in required):
+        return ('<div class="bc bc-card"><div class="bc-ph"><span>KPI trend</span></div>'
+                '<div class="bc-note">KPI trend data is unavailable. Check the gold_kpi_series view.</div></div>')
+
+    plot = k.copy()
+    for col in required[1:]:
+        plot[col] = pd.to_numeric(plot[col], errors="coerce")
+    plot = plot.dropna(subset=["kpi_label"]).tail(7).reset_index(drop=True)
+    if len(plot) < 2:
+        return ('<div class="bc bc-card"><div class="bc-ph"><span>KPI trend</span></div>'
+                '<div class="bc-note">At least two days of KPI history are needed to draw the trend.</div></div>')
+
     W, H, L, R, T, B = 640, 270, 44, 46, 14, 34
-    n = len(k)
+    n = len(plot)
     xs = [L + i * (W - L - R) / (n - 1) for i in range(n)]
-    ymax_r = _nice(max(float(k.operational_delay_hrs.max()), 1.0) * 1.15)
+    delays = plot["operational_delay_hrs"].dropna()
+    ymax_r = _nice(max(float(delays.max()) if not delays.empty else 1.0, 1.0) * 1.15)
 
-    def yl(v):  # left axis 0..100 %
-        return T + (H - T - B) * (1 - float(v) / 100)
+    def yl(v):
+        return T + (H - T - B) * (1 - max(0.0, min(100.0, float(v))) / 100)
 
-    def yr(v):  # right axis 0..ymax_r hours
-        return T + (H - T - B) * (1 - float(v) / ymax_r)
+    def yr(v):
+        return T + (H - T - B) * (1 - max(0.0, float(v)) / ymax_r)
 
     grid, ticks = [], []
     for i in range(5):
@@ -435,23 +448,27 @@ def trend_card(k: pd.DataFrame | None) -> str:
         grid.append(f'<line x1="{L}" x2="{W - R}" y1="{gy:.1f}" y2="{gy:.1f}" style="stroke:var(--line)" stroke-width="1"/>')
         ticks.append(f'<text x="{L - 8}" y="{gy + 4:.1f}" text-anchor="end">{100 - i * 25}</text>')
         ticks.append(f'<text x="{W - R + 8}" y="{gy + 4:.1f}" text-anchor="start">{ymax_r * (4 - i) / 4:g}</text>')
-    xl = "".join(f'<text x="{xs[i]:.1f}" y="{H - 10}" text-anchor="middle">{esc(k.kpi_label.iloc[i])}</text>' for i in range(n))
+    xl = "".join(f'<text x="{xs[i]:.1f}" y="{H - 10}" text-anchor="middle">{esc(plot.kpi_label.iloc[i])}</text>' for i in range(n))
 
     def series(col, ycalc, color, name, unit):
-        pts = [(xs[i], ycalc(k[col].iloc[i])) for i in range(n)]
-        solid = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts[:-1])
-        out = [f'<polyline points="{solid}" fill="none" stroke-width="2.4" stroke-linejoin="round" style="stroke:{color}"/>']
-        out.append(f'<line x1="{pts[-2][0]:.1f}" y1="{pts[-2][1]:.1f}" x2="{pts[-1][0]:.1f}" y2="{pts[-1][1]:.1f}" stroke-width="2.4" '
-                   f'stroke-dasharray="5 5" style="stroke:{color}"/>')
+        vals = plot[col].tolist()
+        pts = [(xs[i], ycalc(vals[i]) if pd.notna(vals[i]) else None) for i in range(n)]
+        valid = [(x, y) for x, y in pts if y is not None]
+        if not valid:
+            return ""
+        out = []
+        if len(valid) >= 2:
+            point_text = " ".join(f"{x:.1f},{y:.1f}" for x, y in valid)
+            out.append(f'<polyline points="{point_text}" fill="none" stroke-width="2.4" stroke-linejoin="round" style="stroke:{color}"/>')
         for i, (x, y) in enumerate(pts):
-            last = i == n - 1
-            tip = f"{k.kpi_label.iloc[i]}: {name} {float(k[col].iloc[i]):.1f} {unit}" + (" (today, partial day)" if last else "")
-            fill = "var(--card-solid)" if last else color
-            out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{4.2 if last else 3}" stroke-width="2" style="stroke:{color};fill:{fill}">'
-                       f'<title>{esc(tip)}</title></circle>')
+            if y is None:
+                continue
+            tip = f"{plot.kpi_label.iloc[i]}: {name} {float(vals[i]):.1f} {unit}"
+            out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.5" stroke-width="2" style="stroke:{color};fill:{color}"><title>{esc(tip)}</title></circle>')
         return "".join(out)
 
-    svg = (f'<svg class="bc-chart" viewBox="0 0 {W} {H}" role="img" aria-label="Seven day KPI trend">{"".join(grid)}{"".join(ticks)}{xl}'
+    svg = (f'<svg class="bc-chart" viewBox="0 0 {W} {H}" role="img" aria-label="Seven day KPI trend">'
+           f'{"".join(grid)}{"".join(ticks)}{xl}'
            f'{series("operational_delay_hrs", yr, "var(--warn)", "Operational delays", "hrs")}'
            f'{series("on_time_pct", yl, "var(--accent)", "On-time delivery", "%")}'
            f'{series("fleet_utilization_pct", yl, "var(--good)", "Fleet utilisation", "%")}</svg>')
@@ -459,7 +476,7 @@ def trend_card(k: pd.DataFrame | None) -> str:
               '<span><i style="background:var(--accent)"></i>On-time delivery (%)</span>'
               '<span><i style="background:var(--warn)"></i>Operational delays (hrs, right axis)</span></div>')
     return (f'<div class="bc bc-card"><div class="bc-ph"><span>KPI trend</span><span class="bc-sub">last 7 days</span></div>{legend}{svg}'
-            f'<div class="bc-foot">Hollow dashed point = today, partial day.</div></div>')
+            '<div class="bc-foot">Hover over a point for its value. Delay hours use the right axis.</div></div>')
 
 
 def alert_icon(sev: str) -> str:
