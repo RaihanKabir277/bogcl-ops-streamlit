@@ -68,7 +68,7 @@ def ago(minutes) -> str:
     if m < 60:
         return f"{m} min ago"
     if m < 1440:
-        return f"{m // 60} h {m % 60:02d} min ago"
+        return f"{m // 60}h {m % 60:02d}m ago"
     return f"{m // 1440} d ago"
 
 
@@ -114,7 +114,7 @@ def ring_tile(title: str, pct, sub: str, color: str) -> str:
             f'<div class="bc-s">{esc(sub)}</div></div></div>')
 
 
-def spark(values, color: str, w: int = 86, h: int = 34) -> str:
+def spark(values, color: str, w: int = 70, h: int = 32) -> str:
     v = [float(x) for x in values if not na(x)]
     if len(v) < 2:
         return ""
@@ -175,7 +175,7 @@ def voyage_strip(vdf: pd.DataFrame, selected: str | None) -> str:
         dist_sub = "" if na(r.distance_nm) else f"of {n0(r.distance_nm)} NM ({n0(r.pct_covered)}%)"
         slip = "" if na(r.eta_slip_hrs) else f"{r.eta_slip_hrs:+.1f} h vs plan"
         eta = r.eta_local if isinstance(r.eta_local, str) else "–"
-        return ('<div class="bc bc-tiles bc-t7">'
+        return ('<div class="bc bc-strip">'
                 + tile("Vessel", r.vessel_name, f"IMO {r.imo}" if not na(r.imo) else "", "ship", small=True)
                 + tile("Voyage", r.voyage_id if isinstance(r.voyage_id, str) else "–", f"{r.voyage_type} voyage", "route", small=True)
                 + tile("Voyage status", r.status, str(r.activity), "status", small=True)
@@ -191,7 +191,7 @@ def voyage_strip(vdf: pd.DataFrame, selected: str | None) -> str:
     nxt_v = nxt.iloc[0].vessel_name if not nxt.empty else "–"
     nxt_s = f"in {duration(nxt.iloc[0].hours_to_arrival)} at {nxt.iloc[0].to_port}" if not nxt.empty else ""
     wait = anchored.anchor_wait_hrs.max() if not anchored.empty else None
-    return ('<div class="bc bc-tiles bc-t7">'
+    return ('<div class="bc bc-strip">'
             + tile("Fleet", f"{len(vdf)} vessels", f"{len(laden)} laden, {len(vdf) - len(laden)} ballast", "ship", small=True)
             + tile("Voyages under way", f"{len(er)}", f"{(100 * covered / total) if total else 0:.0f}% of distance covered", "route", small=True)
             + tile("At anchor", f"{len(anchored)}", f"longest wait {n1(wait)} h" if not na(wait) else "none waiting", "status", small=True)
@@ -252,16 +252,23 @@ def queue_card(vdf: pd.DataFrame) -> str:
 
 
 # --------------------------------------------------------------------------- terminal
-def berth_table(berths: pd.DataFrame, max_h: int | None = None) -> str:
-    rows = [tr([td(r.berth_name), td(r.port_name), td(pill(r.status, BERTH_TONE.get(r.status, "mute")), raw=True),
-                td(r.vessel_name if isinstance(r.vessel_name, str) else "–"),
-                td(r.occupied_since if isinstance(r.occupied_since, str) else "–"),
-                td("–" if na(r.hours_at_berth) or r.status != "Occupied" else f"{n1(r.hours_at_berth)} h", "n")])
-            for r in berths.itertuples()]
-    return table([("Berth", ""), ("Port", ""), ("Status", ""), ("Current vessel", ""), ("Start (GMT+6)", ""), ("At berth", "n")], rows, max_h)
+def berth_table(berths: pd.DataFrame, max_h: int | None = None, compact: bool = True) -> str:
+    """compact=True drops the Port column so the table fits the Overview card."""
+    rows = []
+    for r in berths.itertuples():
+        cells = [td(r.berth_name)]
+        if not compact:
+            cells.append(td(r.port_name))
+        cells += [td(pill(r.status, BERTH_TONE.get(r.status, "mute")), raw=True),
+                  td(r.vessel_name if isinstance(r.vessel_name, str) else "–"),
+                  td(r.occupied_since if isinstance(r.occupied_since, str) else "–"),
+                  td("–" if na(r.hours_at_berth) or r.status != "Occupied" else f"{n1(r.hours_at_berth)} h", "n")]
+        rows.append(tr(cells))
+    hdr = [("Berth", "")] + ([] if compact else [("Port", "")]) + [("Status", ""), ("Current vessel", ""), ("Start (GMT+6)", ""), ("At berth", "n")]
+    return table(hdr, rows, max_h)
 
 
-def terminal_card(berths: pd.DataFrame | None, bays: pd.DataFrame | None, ta: pd.DataFrame | None) -> str:
+def terminal_card(berths: pd.DataFrame | None, bays: pd.DataFrame | None, ta: pd.DataFrame | None, compact: bool = True) -> str:
     tiles = []
     if berths is not None and not berths.empty:
         occ = int((berths.status == "Occupied").sum())
@@ -275,7 +282,7 @@ def terminal_card(berths: pd.DataFrame | None, bays: pd.DataFrame | None, ta: pd
         tiles.append(f'<div class="bc-tile"><div class="bc-rt"><div class="bc-k">Turnaround time</div>'
                      f'<div class="bc-v" style="margin:34px 0 0">{val}</div>'
                      f'<div class="bc-s" style="margin-top:34px">{int(t.vessels_handled_7d)} discharges completed, last 7 days</div></div></div>')
-    tbl = berth_table(berths) if berths is not None and not berths.empty else ""
+    tbl = berth_table(berths, compact=compact) if berths is not None and not berths.empty else ""
     return (f'<div class="bc bc-card"><div class="bc-ph"><span>Terminal operations</span></div>'
             f'<div class="bc-tiles bc-t3">{"".join(tiles)}</div>'
             f'<div class="bc-ph" style="margin:16px 0 8px"><span>Berth and status</span></div>{tbl}</div>')
@@ -313,10 +320,10 @@ def ops_table(ops: pd.DataFrame, selected: str | None = None, max_h: int | None 
     if ops is None or ops.empty:
         return '<div class="bc-note">No cargo operation is running right now.</div>'
     rows = [tr([td(r.vessel_name), td(pill(r.op_type, "info" if r.op_type == "Discharge" else "warn"), raw=True), td(r.product),
-                td(n0(r.planned_mt), "n"), td(progress(r.progress_pct), raw=True), td(r.started), td(r.est_completion)],
+                td(n0(r.planned_mt), "n"), td(progress(r.progress_pct), raw=True), td(r.est_completion)],
                selected=(r.vessel_name == selected)) for r in ops.itertuples()]
     return table([("Vessel", ""), ("Operation", ""), ("Product", ""), ("Planned MT", "n"), ("Progress", ""),
-                  ("Start (GMT+6)", ""), ("Est. completion", "")], rows, max_h)
+                  ("Est. completion (GMT+6)", "")], rows, max_h)
 
 
 def cargo_card(ops: pd.DataFrame | None, tanks: pd.DataFrame | None, today_mt, status: str, selected: str | None) -> str:
@@ -345,14 +352,13 @@ def cargo_card(ops: pd.DataFrame | None, tanks: pd.DataFrame | None, today_mt, s
           f'<div class="bc-v">{n0(today_mt)}<small>MT</small></div><div class="bc-s">today (GMT+6)</div></div>')
     t3 = ring_tile("Tank level (avg)", avg_lvl, "of total tank capacity", "var(--accent-2)")
     t4 = (f'<div class="bc-tile bc-c"><div class="bc-k">Systems</div><div style="margin:14px 0 8px;color:var(--{sys_tone})">{ico("pump", 40)}</div>'
-          f'<div class="bc-v sm">{pill("All systems normal" if status == "Normal" else "Attention needed", sys_tone)}</div>'
-          f'<div class="bc-s" style="margin-top:8px">no critical alert in the last 2 h</div></div>')
+          f'<div style="margin-top:6px">{pill("All normal" if status == "Normal" else "Attention", sys_tone)}</div>'
+          f'<div class="bc-s" style="margin-top:8px;white-space:normal">{"no critical alert in the last 2 h" if status == "Normal" else "critical alert in the last 2 h"}</div></div>')
     bars = tank_bars(tanks) if tanks is not None and not tanks.empty else ""
     return (f'<div class="bc bc-card"><div class="bc-ph"><span>Cargo operations</span></div>'
             f'<div class="bc-tiles bc-t4">{t1}{t2}{t3}{t4}</div>'
-            f'<div class="bc-grid" style="grid-template-columns:minmax(0,5fr) minmax(0,6fr);margin-top:14px">'
-            f'<div><div class="bc-ph" style="margin:0 0 8px"><span>Tank levels overview</span></div>{bars}</div>'
-            f'<div><div class="bc-ph" style="margin:0 0 8px"><span>Active cargo operations</span></div>{ops_table(ops, selected)}</div></div></div>')
+            f'<div class="bc-ph" style="margin:16px 0 8px"><span>Tank levels overview</span></div>{bars}'
+            f'<div class="bc-ph" style="margin:18px 0 8px"><span>Active cargo operations</span></div>{ops_table(ops, selected)}</div>')
 
 
 def tank_table_card(t: pd.DataFrame) -> str:
