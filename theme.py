@@ -125,14 +125,15 @@ BASE_CSS = """
 /* ===== BOGCL components ===== */
 .bc,.bc *{box-sizing:border-box}
 .bc{color:var(--text)}
-.bc-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px 16px 16px;box-shadow:var(--shadow);backdrop-filter:blur(8px);color:var(--text);min-width:0}
+.bc-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px 16px 16px;box-shadow:var(--shadow);backdrop-filter:blur(8px);color:var(--text);min-width:0;overflow:hidden}
 .bc-ph{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
 .bc-sub{font-size:12px;color:var(--muted);font-weight:500;letter-spacing:0;text-transform:none}
 .bc-grid{display:grid;gap:14px;align-items:stretch}
 .bc-r3{grid-template-columns:minmax(0,5fr) minmax(0,7fr)}
 .bc-r4{grid-template-columns:minmax(0,3fr) minmax(0,4fr) minmax(0,2.4fr)}
 .bc-in{display:grid;gap:12px;min-width:0}
-@media (max-width:1250px){.bc-r3,.bc-r4{grid-template-columns:minmax(0,1fr)}}
+.bc-cq{container-type:inline-size;width:100%}
+@container (max-width:1000px){.bc-r3,.bc-r4{grid-template-columns:minmax(0,1fr)}}
 
 .bc-head{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px}
 .bc-brand{display:flex;align-items:center;gap:12px;margin-right:8px}
@@ -154,7 +155,11 @@ BASE_CSS = """
 .bc-k{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);font-weight:600;letter-spacing:.02em}
 .bc-v{font-size:26px;line-height:1.15;font-weight:700;margin-top:6px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bc-v small{font-size:13px;font-weight:600;color:var(--muted);margin-left:4px}
-.bc-v.sm{font-size:17px}
+.bc-v.sm{font-size:16.5px}
+.bc-strip{display:flex;flex-wrap:wrap;gap:10px}
+.bc-strip .bc-tile{flex:1 1 150px}
+.bc-strip .bc-v.sm{white-space:normal;overflow-wrap:anywhere;line-height:1.25}
+.bc-strip .bc-s{white-space:normal}
 .bc-s{font-size:12px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bc-c{text-align:center}.bc-c .bc-k{justify-content:center}
 
@@ -167,7 +172,7 @@ BASE_CSS = """
 .bc-scroll{overflow:auto;border-radius:10px}
 table.bc-t{width:100%;border-collapse:collapse;font-size:13px;color:var(--text)}
 .bc-t th{position:sticky;top:0;background:var(--card-solid);text-align:left;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
-.bc-t td{padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;color:var(--text)}
+.bc-t td{vertical-align:middle;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;color:var(--text)}
 .bc-t tr:last-child td{border-bottom:0}
 .bc-t .n{text-align:right;font-variant-numeric:tabular-nums}
 .bc-t tr.sel td{background:var(--hover)}
@@ -177,17 +182,18 @@ table.bc-t{width:100%;border-collapse:collapse;font-size:13px;color:var(--text)}
 .bc-bar i{display:block;height:100%;border-radius:99px;background:var(--accent)}
 .bc-prog span{font-size:12px;font-variant-numeric:tabular-nums;min-width:36px;text-align:right}
 
-.bc-ring{position:relative;display:grid;place-items:center}
-.bc-ring-c{position:absolute;text-align:center;line-height:1.1}
+.bc-ring{position:relative;margin:0 auto}
+.bc-ring svg{display:block}
+.bc-ring-c{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;line-height:1.1}
 .bc-ring-v{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums}
 .bc-ring-l{font-size:11px;color:var(--muted);margin-top:2px}
 .bc-rt{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
 .bc-rt .bc-s{white-space:normal}
 
-.bc-kpi{display:flex;justify-content:space-between;gap:8px;min-width:0}
+.bc-kpi{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:6px 8px;min-width:0}
 .bc-kpi svg{flex:none;align-self:flex-end}
 .bc-up{color:var(--good)!important}.bc-down{color:var(--bad)!important}.bc-flat{color:var(--muted)!important}
-.bc-delta{font-size:12px;font-weight:700;margin-top:4px;white-space:nowrap}
+.bc-delta{font-size:12px;font-weight:700;margin-top:4px}
 .bc-delta span{color:var(--muted);font-weight:500}
 
 .bc-legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted);margin-bottom:6px}
