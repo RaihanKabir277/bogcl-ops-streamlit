@@ -5,7 +5,6 @@ import hmac
 
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as stc
 
 import components as C
 import data
@@ -110,14 +109,9 @@ def route_map_panel(vdf: pd.DataFrame, selected: str | None, height: int = 360) 
     with st.container(key="mapcard"):
         title = f"Vessel route: {selected}" if selected else "Fleet operations: vessel positions"
         st.html(f'<div class="bc bc-ph" style="margin:0"><span>{C.esc(title)}</span></div>')
-        stc.html(map_view.build_map_html(vdf, ports, routes, selected, trk, st.session_state.get("mode", "Default"), height),
-                 height=height + 4)
+        st.iframe(map_view.build_map_html(vdf, ports, routes, selected, trk, st.session_state.get("mode", "Default"), height),
+                  height=height + 4)
         st.html(C.voyage_strip(vdf, selected))
-
-
-def clock_text() -> str:
-    head = data.header() if False else None  # header is already cached; avoid a second query here
-    return "" if head is None else head
 
 
 # --------------------------------------------------------------------------- pages
@@ -138,12 +132,12 @@ def overview_page() -> None:
     ops, today, status, tanks = load(data.active_ops), load(data.cargo_today), load(data.system_status), load(data.tanks)
     today_mt = None if today is None or today.empty else today.iloc[0].cargo_today_mt
     sys_status = "Normal" if status is None or status.empty else status.iloc[0].system_status
-    st.html('<div class="bc bc-grid bc-r3">' + C.terminal_card(berths, bays, ta)
-            + C.cargo_card(ops, tanks, today_mt, sys_status, selected) + "</div>")
+    st.html('<div class="bc bc-cq"><div class="bc-grid bc-r3">' + C.terminal_card(berths, bays, ta)
+            + C.cargo_card(ops, tanks, today_mt, sys_status, selected) + "</div></div>")
 
     k, al, head = load(data.kpis), load(data.alerts, 25), load(data.header)
     clock = "" if head is None or head.empty else head.iloc[0].clock
-    st.html('<div class="bc bc-grid bc-r4">' + C.exec_kpi_card(k, clock) + C.trend_card(k) + C.alerts_card(al) + "</div>")
+    st.html('<div class="bc bc-cq"><div class="bc-grid bc-r4">' + C.exec_kpi_card(k, clock) + C.trend_card(k) + C.alerts_card(al) + "</div></div>")
     footer()
 
 
@@ -166,7 +160,7 @@ def terminal_page() -> None:
     berths, bays, ta, vdf = load(data.berths), load(data.bays), load(data.turnaround), load(data.vessels)
     a, b = st.columns([1.35, 1], gap="small")
     with a:
-        st.html(C.terminal_card(berths, bays, ta))
+        st.html(C.terminal_card(berths, bays, ta, compact=False))
     with b:
         if vdf is not None and not vdf.empty:
             st.html(C.queue_card(vdf))
