@@ -85,9 +85,16 @@ def header(vdf: pd.DataFrame | None) -> None:
         names = [ALL] + (vdf.vessel_name.tolist() if vdf is not None and not vdf.empty else [])
         if st.session_state.get("vessel") not in names:
             st.session_state["vessel"] = ALL
-        st.selectbox("Vessel", names, key="vessel", label_visibility="collapsed")
+        st.selectbox(
+            "Vessel", names, key="vessel", label_visibility="collapsed",
+            help="Choose a vessel to filter the dashboard and map.",
+        )
     with c_mode:
-        st.radio("Display mode", theme.MODES, horizontal=True, key="mode", label_visibility="collapsed")
+        st.radio(
+            "Display mode", theme.MODES, horizontal=True, key="mode",
+            label_visibility="collapsed",
+            help="Default follows your device setting; Dark and Light force a theme.",
+        )
     with c_btn:
         if st.button("Refresh", width="stretch"):
             st.cache_data.clear()
