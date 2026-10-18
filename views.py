@@ -82,13 +82,12 @@ def header(vdf: pd.DataFrame | None) -> None:
     else:
         today, clock, alerts_count = "Date unavailable", "Time unavailable", 0
 
-    # Preserve the existing visual style. The HTML chips used to overflow out of the
-    # brand's column and sit on top of native widgets, intercepting mouse clicks.
-    # Separate the same brand/chips into columns without changing their CSS classes.
-    cols = st.columns([2.35, 0.88, 1.15, 0.95, 1.45, 1.65, 0.85],
-                      vertical_alignment="center", gap="small")
-    c_brand, c_date, c_clock, c_alerts, c_vessel, c_mode, c_refresh = cols
-
+    # Keep the original brand/chip styling, but split information and controls into
+    # two rows. The old single row squeezed the radio labels into vertical letters
+    # and allowed the wide brand HTML to overlap the widgets at full-screen widths.
+    info_cols = st.columns([2.45, 0.9, 1.15, 1.0],
+                           vertical_alignment="center", gap="small")
+    c_brand, c_date, c_clock, c_alerts = info_cols
     with c_brand:
         st.html(C.head_brand_html())
     with c_date:
@@ -100,6 +99,9 @@ def header(vdf: pd.DataFrame | None) -> None:
         st.html(C.header_chip("alert", f'Alerts ({alerts_count})', tone,
                               "Critical and warning alerts in the last 24 hours"))
 
+    control_cols = st.columns([1.45, 2.0, 0.8],
+                              vertical_alignment="center", gap="small")
+    c_vessel, c_mode, c_refresh = control_cols
     with c_vessel:
         names = [ALL]
         if vdf is not None and not vdf.empty and "vessel_name" in vdf.columns:
@@ -114,7 +116,7 @@ def header(vdf: pd.DataFrame | None) -> None:
                  label_visibility="collapsed", help="Switch the dashboard between Default, Dark, and Light.")
 
     def refresh_dashboard() -> None:
-        # Callback runs before Streamlit's automatic rerun, so the rerun uses fresh query data.
+        # Clearing the cache in the callback makes the following automatic rerun fresh.
         st.cache_data.clear()
 
     with c_refresh:
