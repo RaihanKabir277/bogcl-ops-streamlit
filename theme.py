@@ -135,7 +135,7 @@ BASE_CSS = """
 .bc-cq{container-type:inline-size;width:100%}
 @container (max-width:1000px){.bc-r3,.bc-r4{grid-template-columns:minmax(0,1fr)}}
 
-.bc-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;max-width:100%}\n.bc-head-brand{display:block;overflow:hidden}\n.bc-head-brand .bc-brand{min-width:0;margin-right:0}\n.bc-head-brand .bc-title{font-size:clamp(15px,1.2vw,22px);white-space:normal}\n.bc-head-brand .bc-tag{white-space:normal}\n[data-testid="stHorizontalBlock"]{position:relative}\n[data-testid="stSelectbox"],[data-testid="stRadio"],[data-testid="stButton"]{position:relative;z-index:2}\n[data-testid="stRadio"] label{cursor:pointer}\n[data-baseweb="select"]{cursor:pointer}
+.bc-head{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px}
 .bc-brand{display:flex;align-items:center;gap:12px;margin-right:8px}
 .bc-logo{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:var(--on-accent)}
 .bc-title{font-size:22px;font-weight:800;line-height:1.15;letter-spacing:.01em}
