@@ -428,89 +428,127 @@ def _nice(x: float) -> float:
     return float(math.ceil(x / 100) * 100)
 
 
-def trend_card(k: pd.DataFrame | None, mode: str = "Default") -> str:
-    """Draw the seven-day KPI history in SVG; tolerate null or non-numeric warehouse values."""
-    required = ["kpi_label", "operational_delay_hrs", "on_time_pct", "fleet_utilization_pct"]
-    if k is None or k.empty or any(col not in k.columns for col in required):
-        return ('<div class="bc bc-card"><div class="bc-ph"><span>KPI trend</span></div>'
-                '<div class="bc-note">KPI history is unavailable. Check the gold_kpi_series query and its permissions.</div></div>')
+def executive_fleet_insight_card(vdf: pd.DataFrame | None) -> str:
+    """Compact, data-driven executive fleet insight using the live vessel dataset."""
+    title = '<div class="bc-ph"><span>Executive fleet insights</span><span class="bc-sub">live fleet analysis</span></div>'
+    if vdf is None or vdf.empty or "vessel_name" not in vdf.columns:
+        return f'<div class="bc bc-card">{title}<div class="bc-note">Vessel data is not available for analysis.</div></div>'
 
-    plot = k.copy()
-    for col in required[1:]:
-        plot[col] = pd.to_numeric(plot[col], errors="coerce")
-    plot = plot.dropna(subset=["kpi_label"]).tail(7).reset_index(drop=True)
-    if len(plot) < 2:
-        return ('<div class="bc bc-card"><div class="bc-ph"><span>KPI trend</span></div>'
-                '<div class="bc-note">At least two dated KPI rows are needed to draw a trend.</div></div>')
+    d = vdf.copy()
+    if "avg_speed_kn" not in d.columns:
+        d["avg_speed_kn"] = pd.NA
+    d["_speed"] = pd.to_numeric(d["avg_speed_kn"], errors="coerce")
+    valid = d[d["_speed"].notna() & (d["_speed"] > 0)].copy()
+    if "status" not in d.columns:
+        d["status"] = "Unknown"
+    underway = valid[valid["status"].astype(str).str.casefold().eq("en route")]
+    avg_source = underway if not underway.empty else valid
+    fleet_avg = float(avg_source["_speed"].mean()) if not avg_source.empty else None
 
-    numeric_columns = ["operational_delay_hrs", "on_time_pct", "fleet_utilization_pct"]
-    if not plot[numeric_columns].notna().any().any():
-        return ('<div class="bc bc-card"><div class="bc-ph"><span>KPI trend</span></div>'
-                '<div class="bc-note">KPI history rows were returned, but all trend values are empty. Check the daily KPI calculation feeding gold_kpi_series.</div></div>')
+    def pct_delta(speed):
+        return None if fleet_avg in (None, 0) else (float(speed) - fleet_avg) / fleet_avg * 100
 
-    # The palette follows the existing dashboard's light/dark themes.
-    dark = mode == "Dark"
-    grid_color = "#29405A" if dark else "#D7E0EA"
-    axis_color = "#9DB1CB" if dark else "#52657C"
-    fleet_color = "#3DDC97" if dark else "#11804D"
-    ontime_color = "#4DABFF" if dark else "#0A64C8"
-    delay_color = "#FFB547" if dark else "#A86200"
+    def signed_pct(value):
+        return "—" if value is None else f"{value:+.1f}%"
 
-    W, H, L, R, T, B = 640, 270, 44, 46, 14, 34
-    n = len(plot)
-    xs = [L + i * (W - L - R) / (n - 1) for i in range(n)]
-    delays = plot["operational_delay_hrs"].dropna()
-    delay_max = float(delays.max()) if not delays.empty else 1.0
-    ymax_r = _nice(max(delay_max, 1.0) * 1.15)
+    def vessel_context(row):
+        status = str(row.get("status", "Unknown"))
+        activity = row.get("activity", "")
+        voyage = row.get("voyage_id", "")
+        bits = [status]
+        if not na(activity) and str(activity).strip() and str(activity).strip().casefold() != status.casefold():
+            bits.append(str(activity))
+        if not na(voyage) and str(voyage).strip():
+            bits.append(str(voyage))
+        return " · ".join(esc(x) for x in bits[:3])
 
-    def y_pct(v):
-        return T + (H - T - B) * (1 - max(0.0, min(100.0, float(v))) / 100.0)
+    top_html = '<div class="bc-note">No usable average-speed measurements are available yet.</div>'
+    attention_html = '<div class="bc-note">No en-route vessel speed data is available to rank.</div>'
+    bottom_html = ""
+    if not valid.empty:
+        # Top performer is ranked across all vessels with a recorded voyage-average speed,
+        # matching the executive summary's definition of a voyage average.
+        top = valid.sort_values("_speed", ascending=False).iloc[0]
+        delta = pct_delta(top["_speed"])
+        top_html = (
+            '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 11px;border-radius:12px;'
+            'background:var(--good-bg);border:1px solid color-mix(in srgb,var(--good) 28%,var(--border));">'
+            '<div style="font-size:19px;line-height:1">🏆</div><div style="min-width:0;flex:1">'
+            f'<div style="font-size:12px;color:var(--muted);font-weight:700;letter-spacing:.04em">TOP PERFORMER</div>'
+            f'<div style="font-size:15px;font-weight:800;margin:2px 0">{esc(top.vessel_name)} '
+            f'<span style="white-space:nowrap;color:var(--good)">{float(top["_speed"]):.1f} kn</span></div>'
+            f'<div style="font-size:12px;color:var(--muted)">{signed_pct(delta)} vs fleet average · {vessel_context(top)}</div>'
+            '</div></div>'
+        )
 
-    def y_delay(v):
-        return T + (H - T - B) * (1 - max(0.0, float(v)) / ymax_r)
+    if fleet_avg is not None:
+        if not underway.empty:
+            slow = underway.sort_values("_speed", ascending=True).head(3).copy()
+            worst = slow.iloc[0]
+            worst_delta = pct_delta(worst["_speed"])
+            severity = "High priority" if worst_delta is not None and worst_delta <= -15 else "Monitor"
+            attention_html = (
+                '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 11px;border-radius:12px;'
+                'background:var(--warn-bg);border:1px solid color-mix(in srgb,var(--warn) 30%,var(--border));">'
+                '<div style="font-size:19px;line-height:1">⚠</div><div style="min-width:0;flex:1">'
+                f'<div style="font-size:12px;color:var(--muted);font-weight:700;letter-spacing:.04em">NEEDS ATTENTION · {severity.upper()}</div>'
+                f'<div style="font-size:15px;font-weight:800;margin:2px 0">{esc(worst.vessel_name)} '
+                f'<span style="white-space:nowrap;color:var(--warn)">{float(worst["_speed"]):.1f} kn</span></div>'
+                f'<div style="font-size:12px;color:var(--muted)">{signed_pct(worst_delta)} vs fleet average · verify route, weather and speed data</div>'
+                '</div></div>'
+            )
+            rank_items = []
+            for _, row in slow.iterrows():
+                delta = pct_delta(row["_speed"])
+                tone = "var(--bad)" if delta is not None and delta <= -15 else "var(--muted)"
+                rank_items.append(
+                    '<div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;'
+                    'padding:5px 0;border-bottom:1px solid var(--border);font-size:12px">'
+                    f'<span style="min-width:0;overflow-wrap:anywhere">{esc(row["vessel_name"])}</span>'
+                    f'<span style="font-weight:700;white-space:nowrap">{float(row["_speed"]):.1f} kn</span>'
+                    f'<span style="color:{tone};white-space:nowrap;text-align:right">{signed_pct(delta)}</span></div>'
+                )
+            bottom_html = (
+                '<div style="margin-top:12px"><div style="font-size:11px;font-weight:800;letter-spacing:.08em;'
+                'text-transform:uppercase;color:var(--muted);margin-bottom:4px">Lowest speeds · en route</div>'
+                + "".join(rank_items) + '</div>'
+            )
+        else:
+            attention_html = '<div class="bc-note">No vessels are currently en route; speed exceptions are not ranked.</div>'
 
-    grid, ticks = [], []
-    for i in range(5):
-        gy = T + (H - T - B) * i / 4
-        grid.append(f'<line x1="{L}" x2="{W-R}" y1="{gy:.1f}" y2="{gy:.1f}" stroke="{grid_color}" stroke-width="1"/>')
-        ticks.append(f'<text x="{L-8}" y="{gy+4:.1f}" text-anchor="end" fill="{axis_color}">{100-i*25}</text>')
-        ticks.append(f'<text x="{W-R+8}" y="{gy+4:.1f}" text-anchor="start" fill="{axis_color}">{ymax_r*(4-i)/4:g}</text>')
-    labels = "".join(
-        f'<text x="{xs[i]:.1f}" y="{H-10}" text-anchor="middle" fill="{axis_color}">{esc(plot.kpi_label.iloc[i])}</text>'
-        for i in range(n)
+    active = len(d)
+    n_route = int(d["status"].astype(str).str.casefold().eq("en route").sum())
+    n_anchor = int(d["status"].astype(str).str.casefold().eq("at anchor").sum())
+    n_port = int(d["status"].astype(str).str.casefold().eq("at port").sum())
+    avg_text = f"{fleet_avg:.1f} kn" if fleet_avg is not None else "—"
+    stats = (
+        '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:12px">'
+        f'<div style="padding:8px;border-radius:10px;background:var(--tile);border:1px solid var(--border)"><div style="font-size:11px;color:var(--muted)">En-route avg</div><div style="font-size:17px;font-weight:800">{avg_text}</div></div>'
+        f'<div style="padding:8px;border-radius:10px;background:var(--tile);border:1px solid var(--border)"><div style="font-size:11px;color:var(--muted)">Active fleet</div><div style="font-size:17px;font-weight:800">{active}</div><div style="font-size:10px;color:var(--muted)">{n_route} underway</div></div>'
+        f'<div style="padding:8px;border-radius:10px;background:var(--tile);border:1px solid var(--border)"><div style="font-size:11px;color:var(--muted)">Port / anchor</div><div style="font-size:17px;font-weight:800">{n_port + n_anchor}</div><div style="font-size:10px;color:var(--muted)">{n_port} port · {n_anchor} anchor</div></div>'
+        '</div>'
     )
-
-    def draw_series(col, y_fn, color, name, unit):
-        values = plot[col].tolist()
-        points = [(xs[i], y_fn(values[i]) if pd.notna(values[i]) else None) for i in range(n)]
-        pieces, segment = [], []
-        for x, y in points + [(None, None)]:
-            if y is None:
-                if len(segment) >= 2:
-                    coords = " ".join(f"{px:.1f},{py:.1f}" for px, py in segment)
-                    pieces.append(f'<polyline points="{coords}" fill="none" stroke="{color}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>')
-                segment = []
-            else:
-                segment.append((x, y))
-        for i, (x, y) in enumerate(points):
-            if y is None:
-                continue
-            tip = f"{plot.kpi_label.iloc[i]}: {name} {float(values[i]):.1f} {unit}"
-            pieces.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.6" fill="{color}" stroke="{color}" stroke-width="1.5"><title>{esc(tip)}</title></circle>')
-        return "".join(pieces)
-
-    series_html = (
-        draw_series("fleet_utilization_pct", y_pct, fleet_color, "Fleet utilisation", "%")
-        + draw_series("on_time_pct", y_pct, ontime_color, "On-time delivery", "%")
-        + draw_series("operational_delay_hrs", y_delay, delay_color, "Operational delays", "hrs")
+    recommendation = "Validate speed and voyage context before escalating; investigate vessels materially below the en-route average first."
+    if fleet_avg is not None and not underway.empty:
+        deltas = (underway["_speed"] - fleet_avg) / fleet_avg * 100
+        if (deltas <= -15).any():
+            recommendation = "Priority: investigate vessels more than 15% below the en-route average; confirm route conditions and sensor quality."
+        elif (deltas <= -5).any():
+            recommendation = "Review vessels more than 5% below average and compare route conditions before taking corrective action."
+        else:
+            recommendation = "No major speed outlier against the current en-route average; continue monitoring and share best-practice voyage factors."
+    action = (
+        '<div style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;padding-top:9px;border-top:1px solid var(--border);'
+        'font-size:12px;color:var(--muted)"><span style="color:var(--accent);font-weight:800">ACTION</span>'
+        f'<span>{esc(recommendation)}</span></div>'
     )
-    svg = (f'<svg class="bc-chart" width="100%" height="{H}" viewBox="0 0 {W} {H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Seven day KPI trend">'
-           f'{"".join(grid)}{"".join(ticks)}{labels}{series_html}</svg>')
-    legend = (f'<div class="bc-legend"><span><i style="background:{fleet_color}"></i>Fleet utilisation (%)</span>'
-              f'<span><i style="background:{ontime_color}"></i>On-time delivery (%)</span>'
-              f'<span><i style="background:{delay_color}"></i>Operational delays (hrs, right axis)</span></div>')
-    return (f'<div class="bc bc-card bc-card-trend"><div class="bc-ph"><span>KPI trend</span><span class="bc-sub">last 7 days</span></div>{legend}{svg}'
-            '<div class="bc-foot">Hover over a point for its value. Percentages use the left axis; delay hours use the right axis.</div></div>')
+    return (
+        f'<div class="bc bc-card">{title}'
+        f'<div style="display:grid;gap:8px">{top_html}{attention_html}</div>'
+        f'{bottom_html}{stats}{action}'
+        '<div style="margin-top:8px;font-size:10px;color:var(--muted)">Based on recorded voyage-average speeds; operational context should be verified before intervention.</div>'
+        '</div>'
+    )
 
 
 def alert_icon(sev: str) -> str:
