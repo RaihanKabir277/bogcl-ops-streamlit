@@ -432,7 +432,7 @@ def executive_fleet_insight_card(vdf: pd.DataFrame | None) -> str:
     """Compact, data-driven executive fleet insight using the live vessel dataset."""
     title = '<div class="bc-ph"><span>Executive fleet insights</span><span class="bc-sub">live fleet analysis</span></div>'
     if vdf is None or vdf.empty or "vessel_name" not in vdf.columns:
-        return f'<div class="bc bc-card">{title}<div class="bc-note">Vessel data is not available for analysis.</div></div>'
+        return f'<div class="bc bc-card bc-card-insights">{title}<div class="bc-note">Vessel data is not available for analysis.</div></div>'
 
     d = vdf.copy()
     if "avg_speed_kn" not in d.columns:
@@ -543,7 +543,7 @@ def executive_fleet_insight_card(vdf: pd.DataFrame | None) -> str:
         f'<span>{esc(recommendation)}</span></div>'
     )
     return (
-        f'<div class="bc bc-card">{title}'
+        f'<div class="bc bc-card bc-card-insights">{title}'
         f'<div style="display:grid;gap:8px">{top_html}{attention_html}</div>'
         f'{bottom_html}{stats}{action}'
         '<div style="margin-top:8px;font-size:10px;color:var(--muted)">Based on recorded voyage-average speeds; operational context should be verified before intervention.</div>'
