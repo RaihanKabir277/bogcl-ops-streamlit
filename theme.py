@@ -250,4 +250,46 @@ table.bc-t{width:100%;border-collapse:collapse;font-size:13px;color:var(--text)}
   .bc-chip{white-space:normal;overflow-wrap:anywhere}
 }
 
+/* Subtle semantic finishes: same cards and grid, with section-specific visual cues. */
+.bc-card{position:relative;isolation:isolate;transition:border-color .18s ease,box-shadow .18s ease}
+.bc-card:before{content:"";position:absolute;left:0;right:0;top:0;height:3px;opacity:.92;pointer-events:none;background:var(--section-accent,var(--accent))}
+.bc-card-fleet{--section-accent:var(--info);background:linear-gradient(135deg,color-mix(in srgb,var(--info) 7%,var(--card)),var(--card) 58%)}
+.bc-card-terminal{--section-accent:var(--good);background:linear-gradient(135deg,color-mix(in srgb,var(--good) 7%,var(--card)),var(--card) 58%)}
+.bc-card-cargo{--section-accent:var(--accent-2);background:linear-gradient(135deg,color-mix(in srgb,var(--accent-2) 7%,var(--card)),var(--card) 58%)}
+.bc-card-executive{--section-accent:var(--accent);background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 7%,var(--card)),var(--card) 58%)}
+.bc-card-trend{--section-accent:var(--good);background:linear-gradient(135deg,color-mix(in srgb,var(--good) 5%,var(--card)),var(--card) 62%)}
+.bc-card-alerts{--section-accent:var(--warn);background:linear-gradient(135deg,color-mix(in srgb,var(--warn) 6%,var(--card)),var(--card) 62%)}
+.bc-card .bc-ph>span:first-child{color:var(--section-accent,var(--muted))}
+.bc-tile{position:relative;overflow:hidden;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.bc-tile:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--accent) 38%,var(--line));box-shadow:0 5px 14px rgba(20,45,75,.07)}
+.bc-card-fleet .bc-tiles>.bc-tile:nth-child(1){border-top:2px solid var(--info)}
+.bc-card-fleet .bc-tiles>.bc-tile:nth-child(2){border-top:2px solid var(--good)}
+.bc-card-fleet .bc-tiles>.bc-tile:nth-child(3){border-top:2px solid var(--warn)}
+.bc-card-fleet .bc-tiles>.bc-tile:nth-child(4){border-top:2px solid var(--accent)}
+.bc-card-terminal .bc-tiles>.bc-tile:nth-child(1){border-top:2px solid var(--good)}
+.bc-card-terminal .bc-tiles>.bc-tile:nth-child(2){border-top:2px solid var(--accent)}
+.bc-card-terminal .bc-tiles>.bc-tile:nth-child(3){border-top:2px solid var(--warn)}
+.bc-card-cargo .bc-tiles>.bc-tile:nth-child(1){border-top:2px solid var(--good)}
+.bc-card-cargo .bc-tiles>.bc-tile:nth-child(2){border-top:2px solid var(--accent)}
+.bc-card-cargo .bc-tiles>.bc-tile:nth-child(3){border-top:2px solid var(--accent-2)}
+.bc-card-cargo .bc-tiles>.bc-tile:nth-child(4){border-top:2px solid var(--good)}
+.bc-card-executive .bc-tiles>.bc-tile:nth-child(1){border-top:2px solid var(--good)}
+.bc-card-executive .bc-tiles>.bc-tile:nth-child(2){border-top:2px solid var(--accent)}
+.bc-card-executive .bc-tiles>.bc-tile:nth-child(3){border-top:2px solid var(--info)}
+.bc-card-executive .bc-tiles>.bc-tile:nth-child(4){border-top:2px solid var(--warn)}
+.bc-card-executive .bc-tiles>.bc-tile:nth-child(5){border-top:2px solid var(--accent-2)}
+.bc-card-executive .bc-tiles>.bc-tile:nth-child(6){border-top:2px solid var(--bad)}
+.bc-card-alerts .bc-al{border-radius:9px;padding-left:6px;padding-right:6px;transition:background .15s ease}
+.bc-card-alerts .bc-al:hover{background:var(--hover)}
+.bc-chart{min-height:210px;overflow:visible}
+/* The map's voyage summary uses the same seven-purpose accent system. */
+.bc-strip>.bc-tile:nth-child(1){border-top:2px solid var(--info)}
+.bc-strip>.bc-tile:nth-child(2){border-top:2px solid var(--good)}
+.bc-strip>.bc-tile:nth-child(3){border-top:2px solid var(--warn)}
+.bc-strip>.bc-tile:nth-child(4){border-top:2px solid var(--accent)}
+.bc-strip>.bc-tile:nth-child(5){border-top:2px solid var(--accent-2)}
+.bc-strip>.bc-tile:nth-child(6){border-top:2px solid var(--good)}
+.bc-strip>.bc-tile:nth-child(7){border-top:2px solid var(--warn)}
+@media (prefers-reduced-motion:reduce){.bc-card,.bc-tile,.bc-card-alerts .bc-al{transition:none}.bc-tile:hover{transform:none}}
+
 """
