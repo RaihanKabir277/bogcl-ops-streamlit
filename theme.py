@@ -105,6 +105,16 @@ BASE_CSS = """
 .stButton>button *{color:var(--text)!important}
 .stButton>button:hover{border-color:var(--accent)!important}
 .stButton>button:hover *{color:var(--accent)!important}
+[data-testid="stButton"] button,[data-testid="stButton"] button:focus,[data-testid="stButton"] button:active{
+  background:var(--field)!important;background-color:var(--field)!important;background-image:none!important;
+  color:var(--text)!important;-webkit-text-fill-color:var(--text)!important;border-color:var(--border)!important;
+}
+[data-testid="stButton"] button span,[data-testid="stButton"] button p,[data-testid="stButton"] button div{
+  color:var(--text)!important;-webkit-text-fill-color:var(--text)!important;
+}
+[data-testid="stButton"] button:hover span,[data-testid="stButton"] button:hover p,[data-testid="stButton"] button:hover div{
+  color:var(--accent)!important;-webkit-text-fill-color:var(--accent)!important;
+}
 
 /* text + chat inputs */
 [data-baseweb="input"],[data-baseweb="base-input"]{background:var(--field)!important;border-color:var(--border)!important}
