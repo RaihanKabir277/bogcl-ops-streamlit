@@ -96,8 +96,8 @@ BASE_CSS = """
 [data-baseweb="popover"] li:hover,[data-baseweb="popover"] li[aria-selected="true"]{background:var(--hover)!important}
 
 /* mode switch (radio shown as pills) and buttons */
-[data-testid="stRadio"] [role="radiogroup"]{gap:.35rem;flex-wrap:nowrap}
-[data-testid="stRadio"] label{border:1px solid var(--border);background:var(--field);border-radius:999px;padding:.18rem .8rem;margin:0}
+[data-testid="stRadio"]{min-width:0;overflow:visible}[data-testid="stRadio"] [role="radiogroup"]{gap:.35rem;flex-wrap:nowrap;min-width:max-content;overflow:visible}
+[data-testid="stRadio"] label{border:1px solid var(--border);background:var(--field);border-radius:999px;padding:.18rem .65rem;margin:0;white-space:nowrap;flex-shrink:0;min-width:max-content}
 [data-testid="stRadio"] label *{color:var(--text)!important;font-weight:600}
 [data-testid="stRadio"] label:has(input:checked){background:var(--accent);border-color:var(--accent)}
 [data-testid="stRadio"] label:has(input:checked) *{color:var(--on-accent)!important}
@@ -226,4 +226,18 @@ table.bc-t{width:100%;border-collapse:collapse;font-size:13px;color:var(--text)}
 .bc-sql{margin-top:8px}
 .bc-sql summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:13px}
 .bc-sql pre{margin:8px 0 0;padding:12px 14px;border-radius:10px;background:var(--card-solid);border:1px solid var(--border);color:var(--text);font-size:12.5px;line-height:1.5;overflow:auto;white-space:pre-wrap}
+
+/* Responsive top-bar controls: keep mode names on one line and preserve usable hit areas. */
+@media (max-width: 1050px) {
+  [data-testid="stMainBlockContainer"]{padding-left:1rem!important;padding-right:1rem!important}
+  [data-testid="stRadio"] label{padding:.18rem .45rem}
+  .bc-chip{padding:7px 9px;font-size:12px}
+  .bc-title{font-size:18px}
+}
+@media (max-width: 760px) {
+  [data-testid="stRadio"] label{padding:.18rem .4rem;font-size:12px}
+  [data-testid="stRadio"] [role="radiogroup"]{gap:.2rem}
+  .bc-chip{white-space:normal;overflow-wrap:anywhere}
+}
+
 """
