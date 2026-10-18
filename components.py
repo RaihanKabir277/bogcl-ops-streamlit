@@ -443,6 +443,11 @@ def trend_card(k: pd.DataFrame | None, mode: str = "Default") -> str:
         return ('<div class="bc bc-card"><div class="bc-ph"><span>KPI trend</span></div>'
                 '<div class="bc-note">At least two dated KPI rows are needed to draw a trend.</div></div>')
 
+    numeric_columns = ["operational_delay_hrs", "on_time_pct", "fleet_utilization_pct"]
+    if not plot[numeric_columns].notna().any().any():
+        return ('<div class="bc bc-card"><div class="bc-ph"><span>KPI trend</span></div>'
+                '<div class="bc-note">KPI history rows were returned, but all trend values are empty. Check the daily KPI calculation feeding gold_kpi_series.</div></div>')
+
     # The palette follows the existing dashboard's light/dark themes.
     dark = mode == "Dark"
     grid_color = "#29405A" if dark else "#D7E0EA"
@@ -499,7 +504,7 @@ def trend_card(k: pd.DataFrame | None, mode: str = "Default") -> str:
         + draw_series("on_time_pct", y_pct, ontime_color, "On-time delivery", "%")
         + draw_series("operational_delay_hrs", y_delay, delay_color, "Operational delays", "hrs")
     )
-    svg = (f'<svg class="bc-chart" viewBox="0 0 {W} {H}" role="img" aria-label="Seven day KPI trend">'
+    svg = (f'<svg class="bc-chart" width="100%" height="{H}" viewBox="0 0 {W} {H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Seven day KPI trend">'
            f'{"".join(grid)}{"".join(ticks)}{labels}{series_html}</svg>')
     legend = (f'<div class="bc-legend"><span><i style="background:{fleet_color}"></i>Fleet utilisation (%)</span>'
               f'<span><i style="background:{ontime_color}"></i>On-time delivery (%)</span>'
