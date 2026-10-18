@@ -215,14 +215,46 @@ def tanks() -> pd.DataFrame:
 
 
 def kpis() -> pd.DataFrame:
-    """Last 7 days + live today (gold_kpi_series)."""
-    return q("""
-        SELECT date_format(kpi_date, 'yyyy-MM-dd') AS kpi_date, date_format(kpi_date, 'dd MMM') AS kpi_label,
-               fleet_utilization_pct, cargo_delivered_mt, on_time_pct, operational_delay_hrs,
-               fuel_consumption_kl, critical_alerts, is_live
+    """Load the seven-day KPI series, with a source-table fallback if the view is empty/unavailable."""
+    series_sql = """
+        SELECT date_format(kpi_date, 'yyyy-MM-dd') AS kpi_date,
+               date_format(kpi_date, 'dd MMM') AS kpi_label,
+               fleet_utilization_pct, cargo_delivered_mt, on_time_pct,
+               operational_delay_hrs, fuel_consumption_kl, critical_alerts, is_live
         FROM {fq}.gold_kpi_series
-        WHERE kpi_date >= date_sub((SELECT as_of_date FROM {fq}.gold_as_of), 6)
-        ORDER BY kpi_date""")
+        WHERE kpi_date >= date_sub((SELECT max(as_of_date) FROM {fq}.gold_as_of), 6)
+        ORDER BY kpi_date
+    """
+    try:
+        result = q(series_sql)
+        if result is not None and len(result) >= 2:
+            return result
+    except Exception:
+        # Some deployments have the underlying daily/live views but have not exposed
+        # gold_kpi_series as a queryable object to the app's configured principal.
+        pass
+
+    # Keep the same business logic as the supplied gold_kpi_series definition:
+    # completed daily rows before as_of_date plus the live, partial row for today.
+    fallback_sql = """
+        SELECT date_format(kpi_date, 'yyyy-MM-dd') AS kpi_date,
+               date_format(kpi_date, 'dd MMM') AS kpi_label,
+               fleet_utilization_pct, cargo_delivered_mt, on_time_pct,
+               operational_delay_hrs, fuel_consumption_kl, critical_alerts,
+               false AS is_live
+        FROM {fq}.kpi_daily
+        WHERE kpi_date >= date_sub((SELECT max(as_of_date) FROM {fq}.gold_as_of), 6)
+          AND kpi_date < (SELECT max(as_of_date) FROM {fq}.gold_as_of)
+        UNION ALL
+        SELECT date_format(kpi_date, 'yyyy-MM-dd') AS kpi_date,
+               date_format(kpi_date, 'dd MMM') AS kpi_label,
+               fleet_utilization_pct, cargo_delivered_mt, on_time_pct,
+               operational_delay_hrs, fuel_consumption_kl, critical_alerts,
+               true AS is_live
+        FROM {fq}.gold_kpi_today
+        ORDER BY kpi_date
+    """
+    return q(fallback_sql)
 
 
 def alerts(limit: int = 60) -> pd.DataFrame:
