@@ -76,27 +76,45 @@ def selected_vessel() -> str | None:
 # --------------------------------------------------------------------------- top bar
 def header(vdf: pd.DataFrame | None) -> None:
     head = load(data.header)
-    c_brand, c_vessel, c_mode, c_btn = st.columns([6.0, 2.1, 2.5, 1.1], vertical_alignment="center", gap="small")
+    if head is not None and not head.empty:
+        h = head.iloc[0]
+        today, clock, alerts_count = str(h.today), str(h.clock), int(h.open_alerts)
+    else:
+        today, clock, alerts_count = "Date unavailable", "Time unavailable", 0
+
+    # Keep HTML content within its own column. The previous wide flex header could
+    # overflow over the native widgets, making clicks appear not to work.
+    c_brand, c_date, c_clock, c_alerts, c_vessel, c_mode, c_btn = st.columns(
+        [3.3, 1.15, 1.35, 1.25, 1.8, 2.0, 1.0],
+        vertical_alignment="center", gap="small"
+    )
     with c_brand:
-        if head is not None and not head.empty:
-            h = head.iloc[0]
-            st.html(C.head_html(h.today, h.clock, int(h.open_alerts)))
+        st.html(C.head_html(today, clock, alerts_count))
+    with c_date:
+        st.html(C.header_chip("Date", today))
+    with c_clock:
+        st.html(C.header_chip("Time", f"{clock} (GMT+6)"))
+    with c_alerts:
+        tone = "bad" if alerts_count else "ok"
+        st.html(C.header_chip("Alerts", str(alerts_count), tone))
     with c_vessel:
-        names = [ALL] + (vdf.vessel_name.tolist() if vdf is not None and not vdf.empty else [])
+        names = [ALL] + (vdf.vessel_name.dropna().astype(str).tolist()
+                         if vdf is not None and not vdf.empty and "vessel_name" in vdf.columns else [])
         if st.session_state.get("vessel") not in names:
             st.session_state["vessel"] = ALL
         st.selectbox(
             "Vessel", names, key="vessel", label_visibility="collapsed",
-            help="Choose a vessel to filter the dashboard and map.",
+            help="Choose a vessel to filter the dashboard and map."
         )
     with c_mode:
         st.radio(
             "Display mode", theme.MODES, horizontal=True, key="mode",
             label_visibility="collapsed",
-            help="Default follows your device setting; Dark and Light force a theme.",
+            help="Default follows your device setting; Dark and Light force a theme."
         )
     with c_btn:
-        if st.button("Refresh", width="stretch"):
+        if st.button("↻ Refresh", key="refresh_dashboard", width="stretch",
+                     help="Clear cached data and reload the dashboard"):
             st.cache_data.clear()
             st.rerun()
 
