@@ -160,6 +160,19 @@ def head_html(today: str, clock: str, open_alerts: int) -> str:
             f'<span class="bc-chip {chip_cls}" title="Critical and warning alerts in the last 24 hours">{ico("alert")}Alerts ({int(open_alerts)})</span></div>')
 
 
+def head_brand_html() -> str:
+    """The original brand block, rendered in its own column to prevent overlap with widgets."""
+    return (f'<div class="bc bc-head"><div class="bc-brand"><div class="bc-logo">{ico("compass", 24)}</div><div>'
+            f'<div class="bc-title">BOGCL Marine Operations</div><div class="bc-tag">Real-time vessel and terminal monitoring</div></div></div></div>')
+
+
+def header_chip(icon_name: str, value: str, tone: str = "", title: str = "") -> str:
+    """Use the existing bc-chip classes so header chip appearance remains unchanged."""
+    cls = (" " + tone) if tone else ""
+    tip = f' title="{esc(title)}"' if title else ""
+    return f'<div class="bc"><span class="bc-chip{cls}"{tip}>{ico(icon_name)}{value}</span></div>'
+
+
 # --------------------------------------------------------------------------- fleet
 def voyage_strip(vdf: pd.DataFrame, selected: str | None) -> str:
     """The row of tiles under the map: one vessel's voyage, or a fleet summary when 'All Vessels' is selected."""
@@ -415,12 +428,12 @@ def _nice(x: float) -> float:
     return float(math.ceil(x / 100) * 100)
 
 
-def trend_card(k: pd.DataFrame | None) -> str:
-    """Render a resilient seven-day SVG trend; tolerate null and non-numeric KPI values."""
+def trend_card(k: pd.DataFrame | None, mode: str = "Default") -> str:
+    """Draw the seven-day KPI history in SVG; tolerate null or non-numeric warehouse values."""
     required = ["kpi_label", "operational_delay_hrs", "on_time_pct", "fleet_utilization_pct"]
     if k is None or k.empty or any(col not in k.columns for col in required):
         return ('<div class="bc bc-card"><div class="bc-ph"><span>KPI trend</span></div>'
-                '<div class="bc-note">KPI trend data is unavailable. Check the gold_kpi_series view.</div></div>')
+                '<div class="bc-note">KPI history is unavailable. Check the gold_kpi_series query and its permissions.</div></div>')
 
     plot = k.copy()
     for col in required[1:]:
@@ -428,55 +441,71 @@ def trend_card(k: pd.DataFrame | None) -> str:
     plot = plot.dropna(subset=["kpi_label"]).tail(7).reset_index(drop=True)
     if len(plot) < 2:
         return ('<div class="bc bc-card"><div class="bc-ph"><span>KPI trend</span></div>'
-                '<div class="bc-note">At least two days of KPI history are needed to draw the trend.</div></div>')
+                '<div class="bc-note">At least two dated KPI rows are needed to draw a trend.</div></div>')
+
+    # The palette follows the existing dashboard's light/dark themes.
+    dark = mode == "Dark"
+    grid_color = "#29405A" if dark else "#D7E0EA"
+    axis_color = "#9DB1CB" if dark else "#52657C"
+    fleet_color = "#3DDC97" if dark else "#11804D"
+    ontime_color = "#4DABFF" if dark else "#0A64C8"
+    delay_color = "#FFB547" if dark else "#A86200"
 
     W, H, L, R, T, B = 640, 270, 44, 46, 14, 34
     n = len(plot)
     xs = [L + i * (W - L - R) / (n - 1) for i in range(n)]
     delays = plot["operational_delay_hrs"].dropna()
-    ymax_r = _nice(max(float(delays.max()) if not delays.empty else 1.0, 1.0) * 1.15)
+    delay_max = float(delays.max()) if not delays.empty else 1.0
+    ymax_r = _nice(max(delay_max, 1.0) * 1.15)
 
-    def yl(v):
-        return T + (H - T - B) * (1 - max(0.0, min(100.0, float(v))) / 100)
+    def y_pct(v):
+        return T + (H - T - B) * (1 - max(0.0, min(100.0, float(v))) / 100.0)
 
-    def yr(v):
+    def y_delay(v):
         return T + (H - T - B) * (1 - max(0.0, float(v)) / ymax_r)
 
     grid, ticks = [], []
     for i in range(5):
         gy = T + (H - T - B) * i / 4
-        grid.append(f'<line x1="{L}" x2="{W - R}" y1="{gy:.1f}" y2="{gy:.1f}" style="stroke:var(--line)" stroke-width="1"/>')
-        ticks.append(f'<text x="{L - 8}" y="{gy + 4:.1f}" text-anchor="end">{100 - i * 25}</text>')
-        ticks.append(f'<text x="{W - R + 8}" y="{gy + 4:.1f}" text-anchor="start">{ymax_r * (4 - i) / 4:g}</text>')
-    xl = "".join(f'<text x="{xs[i]:.1f}" y="{H - 10}" text-anchor="middle">{esc(plot.kpi_label.iloc[i])}</text>' for i in range(n))
+        grid.append(f'<line x1="{L}" x2="{W-R}" y1="{gy:.1f}" y2="{gy:.1f}" stroke="{grid_color}" stroke-width="1"/>')
+        ticks.append(f'<text x="{L-8}" y="{gy+4:.1f}" text-anchor="end" fill="{axis_color}">{100-i*25}</text>')
+        ticks.append(f'<text x="{W-R+8}" y="{gy+4:.1f}" text-anchor="start" fill="{axis_color}">{ymax_r*(4-i)/4:g}</text>')
+    labels = "".join(
+        f'<text x="{xs[i]:.1f}" y="{H-10}" text-anchor="middle" fill="{axis_color}">{esc(plot.kpi_label.iloc[i])}</text>'
+        for i in range(n)
+    )
 
-    def series(col, ycalc, color, name, unit):
-        vals = plot[col].tolist()
-        pts = [(xs[i], ycalc(vals[i]) if pd.notna(vals[i]) else None) for i in range(n)]
-        valid = [(x, y) for x, y in pts if y is not None]
-        if not valid:
-            return ""
-        out = []
-        if len(valid) >= 2:
-            point_text = " ".join(f"{x:.1f},{y:.1f}" for x, y in valid)
-            out.append(f'<polyline points="{point_text}" fill="none" stroke-width="2.4" stroke-linejoin="round" style="stroke:{color}"/>')
-        for i, (x, y) in enumerate(pts):
+    def draw_series(col, y_fn, color, name, unit):
+        values = plot[col].tolist()
+        points = [(xs[i], y_fn(values[i]) if pd.notna(values[i]) else None) for i in range(n)]
+        pieces, segment = [], []
+        for x, y in points + [(None, None)]:
+            if y is None:
+                if len(segment) >= 2:
+                    coords = " ".join(f"{px:.1f},{py:.1f}" for px, py in segment)
+                    pieces.append(f'<polyline points="{coords}" fill="none" stroke="{color}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>')
+                segment = []
+            else:
+                segment.append((x, y))
+        for i, (x, y) in enumerate(points):
             if y is None:
                 continue
-            tip = f"{plot.kpi_label.iloc[i]}: {name} {float(vals[i]):.1f} {unit}"
-            out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.5" stroke-width="2" style="stroke:{color};fill:{color}"><title>{esc(tip)}</title></circle>')
-        return "".join(out)
+            tip = f"{plot.kpi_label.iloc[i]}: {name} {float(values[i]):.1f} {unit}"
+            pieces.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.6" fill="{color}" stroke="{color}" stroke-width="1.5"><title>{esc(tip)}</title></circle>')
+        return "".join(pieces)
 
+    series_html = (
+        draw_series("fleet_utilization_pct", y_pct, fleet_color, "Fleet utilisation", "%")
+        + draw_series("on_time_pct", y_pct, ontime_color, "On-time delivery", "%")
+        + draw_series("operational_delay_hrs", y_delay, delay_color, "Operational delays", "hrs")
+    )
     svg = (f'<svg class="bc-chart" viewBox="0 0 {W} {H}" role="img" aria-label="Seven day KPI trend">'
-           f'{"".join(grid)}{"".join(ticks)}{xl}'
-           f'{series("operational_delay_hrs", yr, "var(--warn)", "Operational delays", "hrs")}'
-           f'{series("on_time_pct", yl, "var(--accent)", "On-time delivery", "%")}'
-           f'{series("fleet_utilization_pct", yl, "var(--good)", "Fleet utilisation", "%")}</svg>')
-    legend = ('<div class="bc-legend"><span><i style="background:var(--good)"></i>Fleet utilisation (%)</span>'
-              '<span><i style="background:var(--accent)"></i>On-time delivery (%)</span>'
-              '<span><i style="background:var(--warn)"></i>Operational delays (hrs, right axis)</span></div>')
+           f'{"".join(grid)}{"".join(ticks)}{labels}{series_html}</svg>')
+    legend = (f'<div class="bc-legend"><span><i style="background:{fleet_color}"></i>Fleet utilisation (%)</span>'
+              f'<span><i style="background:{ontime_color}"></i>On-time delivery (%)</span>'
+              f'<span><i style="background:{delay_color}"></i>Operational delays (hrs, right axis)</span></div>')
     return (f'<div class="bc bc-card"><div class="bc-ph"><span>KPI trend</span><span class="bc-sub">last 7 days</span></div>{legend}{svg}'
-            '<div class="bc-foot">Hover over a point for its value. Delay hours use the right axis.</div></div>')
+            '<div class="bc-foot">Hover over a point for its value. Percentages use the left axis; delay hours use the right axis.</div></div>')
 
 
 def alert_icon(sev: str) -> str:
