@@ -76,29 +76,50 @@ def selected_vessel() -> str | None:
 # --------------------------------------------------------------------------- top bar
 def header(vdf: pd.DataFrame | None) -> None:
     head = load(data.header)
-    c_brand, c_vessel, c_mode, c_btn = st.columns([6.0, 2.1, 2.5, 1.1], vertical_alignment="center", gap="small")
+    if head is not None and not head.empty:
+        h = head.iloc[0]
+        today, clock, alerts_count = str(h.today), str(h.clock), int(h.open_alerts)
+    else:
+        today, clock, alerts_count = "Date unavailable", "Time unavailable", 0
+
+    # Preserve the existing visual style. The HTML chips used to overflow out of the
+    # brand's column and sit on top of native widgets, intercepting mouse clicks.
+    # Separate the same brand/chips into columns without changing their CSS classes.
+    cols = st.columns([2.35, 0.88, 1.15, 0.95, 1.45, 1.65, 0.85],
+                      vertical_alignment="center", gap="small")
+    c_brand, c_date, c_clock, c_alerts, c_vessel, c_mode, c_refresh = cols
+
     with c_brand:
-        if head is not None and not head.empty:
-            h = head.iloc[0]
-            st.html(C.head_html(h.today, h.clock, int(h.open_alerts)))
+        st.html(C.head_brand_html())
+    with c_date:
+        st.html(C.header_chip("calendar", C.esc(today)))
+    with c_clock:
+        st.html(C.header_chip("clock", f'{C.esc(clock)} <span class="bc-dim">(GMT+6)</span>'))
+    with c_alerts:
+        tone = "bad" if alerts_count else "ok"
+        st.html(C.header_chip("alert", f'Alerts ({alerts_count})', tone,
+                              "Critical and warning alerts in the last 24 hours"))
+
     with c_vessel:
-        names = [ALL] + (vdf.vessel_name.tolist() if vdf is not None and not vdf.empty else [])
-        if st.session_state.get("vessel") not in names:
+        names = [ALL]
+        if vdf is not None and not vdf.empty and "vessel_name" in vdf.columns:
+            names += sorted(vdf["vessel_name"].dropna().astype(str).unique().tolist())
+        if st.session_state.get("vessel", ALL) not in names:
             st.session_state["vessel"] = ALL
-        st.selectbox(
-            "Vessel", names, key="vessel", label_visibility="collapsed",
-            help="Choose a vessel to filter the dashboard and map.",
-        )
+        st.selectbox("Vessel", names, key="vessel", label_visibility="collapsed",
+                     help="Filter vessel positions and voyage details.")
+
     with c_mode:
-        st.radio(
-            "Display mode", theme.MODES, horizontal=True, key="mode",
-            label_visibility="collapsed",
-            help="Default follows your device setting; Dark and Light force a theme.",
-        )
-    with c_btn:
-        if st.button("Refresh", width="stretch"):
-            st.cache_data.clear()
-            st.rerun()
+        st.radio("Display mode", theme.MODES, horizontal=True, key="mode",
+                 label_visibility="collapsed", help="Switch the dashboard between Default, Dark, and Light.")
+
+    def refresh_dashboard() -> None:
+        # Callback runs before Streamlit's automatic rerun, so the rerun uses fresh query data.
+        st.cache_data.clear()
+
+    with c_refresh:
+        st.button("Refresh", key="refresh_dashboard", on_click=refresh_dashboard,
+                  width="stretch", help="Clear cached data and reload the dashboard.")
 
 
 def footer() -> None:
@@ -144,7 +165,7 @@ def overview_page() -> None:
 
     k, al, head = load(data.kpis), load(data.alerts, 25), load(data.header)
     clock = "" if head is None or head.empty else head.iloc[0].clock
-    st.html('<div class="bc bc-cq"><div class="bc-grid bc-r4">' + C.exec_kpi_card(k, clock) + C.trend_card(k) + C.alerts_card(al) + "</div></div>")
+    st.html('<div class="bc bc-cq"><div class="bc-grid bc-r4">' + C.exec_kpi_card(k, clock) + C.trend_card(k, st.session_state.get("mode", "Default")) + C.alerts_card(al) + "</div></div>")
     footer()
 
 
