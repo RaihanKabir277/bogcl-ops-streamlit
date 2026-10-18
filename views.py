@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 import hmac
-from datetime import datetime
-from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
@@ -76,69 +74,24 @@ def selected_vessel() -> str | None:
 
 
 # --------------------------------------------------------------------------- top bar
-@st.fragment(run_every="1s")
-def _live_date_chip() -> None:
-    """Render the actual Bangladesh calendar date, refreshed independently each second."""
-    now = datetime.now(ZoneInfo("Asia/Dhaka"))
-    today = now.strftime("%d %b %Y").lstrip("0")
-    st.html(C.header_chip("calendar", C.esc(today)))
-
-
-@st.fragment(run_every="1s")
-def _live_clock_chip() -> None:
-    """Render the actual Bangladesh wall clock, ticking without a full-page rerun."""
-    now = datetime.now(ZoneInfo("Asia/Dhaka"))
-    clock = now.strftime("%I:%M %p").lstrip("0")
-    st.html(C.header_chip("clock", f'{C.esc(clock)} <span class="bc-dim">(GMT+6)</span>'))
-
-
 def header(vdf: pd.DataFrame | None) -> None:
     head = load(data.header)
-    if head is not None and not head.empty:
-        alerts_count = int(head.iloc[0].open_alerts)
-    else:
-        alerts_count = 0
-
-    # Keep the original brand/chip styling, but split information and controls into
-    # two rows. The old single row squeezed the radio labels into vertical letters
-    # and allowed the wide brand HTML to overlap the widgets at full-screen widths.
-    info_cols = st.columns([2.45, 0.9, 1.15, 1.0],
-                           vertical_alignment="center", gap="small")
-    c_brand, c_date, c_clock, c_alerts = info_cols
+    c_brand, c_vessel, c_mode, c_btn = st.columns([6.0, 2.1, 2.5, 1.1], vertical_alignment="center", gap="small")
     with c_brand:
-        st.html(C.head_brand_html())
-    with c_date:
-        _live_date_chip()
-    with c_clock:
-        _live_clock_chip()
-    with c_alerts:
-        tone = "bad" if alerts_count else "ok"
-        st.html(C.header_chip("alert", f'Alerts ({alerts_count})', tone,
-                              "Critical and warning alerts in the last 24 hours"))
-
-    control_cols = st.columns([1.45, 2.0, 0.8],
-                              vertical_alignment="center", gap="small")
-    c_vessel, c_mode, c_refresh = control_cols
+        if head is not None and not head.empty:
+            h = head.iloc[0]
+            st.html(C.head_html(h.today, h.clock, int(h.open_alerts)))
     with c_vessel:
-        names = [ALL]
-        if vdf is not None and not vdf.empty and "vessel_name" in vdf.columns:
-            names += sorted(vdf["vessel_name"].dropna().astype(str).unique().tolist())
-        if st.session_state.get("vessel", ALL) not in names:
+        names = [ALL] + (vdf.vessel_name.tolist() if vdf is not None and not vdf.empty else [])
+        if st.session_state.get("vessel") not in names:
             st.session_state["vessel"] = ALL
-        st.selectbox("Vessel", names, key="vessel", label_visibility="collapsed",
-                     help="Filter vessel positions and voyage details.")
-
+        st.selectbox("Vessel", names, key="vessel", label_visibility="collapsed")
     with c_mode:
-        st.radio("Display mode", theme.MODES, horizontal=True, key="mode",
-                 label_visibility="collapsed", help="Switch the dashboard between Default, Dark, and Light.")
-
-    def refresh_dashboard() -> None:
-        # Clearing the cache in the callback makes the following automatic rerun fresh.
-        st.cache_data.clear()
-
-    with c_refresh:
-        st.button("Refresh", key="refresh_dashboard", on_click=refresh_dashboard,
-                  width="stretch", help="Clear cached data and reload the dashboard.")
+        st.radio("Display mode", theme.MODES, horizontal=True, key="mode", label_visibility="collapsed")
+    with c_btn:
+        if st.button("Refresh", width="stretch"):
+            st.cache_data.clear()
+            st.rerun()
 
 
 def footer() -> None:
@@ -184,7 +137,7 @@ def overview_page() -> None:
 
     k, al, head = load(data.kpis), load(data.alerts, 25), load(data.header)
     clock = "" if head is None or head.empty else head.iloc[0].clock
-    st.html('<div class="bc bc-cq"><div class="bc-grid bc-r4">' + C.exec_kpi_card(k, clock) + C.executive_fleet_insight_card(vdf) + C.alerts_card(al) + "</div></div>")
+    st.html('<div class="bc bc-cq"><div class="bc-grid bc-r4">' + C.exec_kpi_card(k, clock) + C.trend_card(k) + C.alerts_card(al) + "</div></div>")
     footer()
 
 
@@ -254,42 +207,169 @@ def render_entry(entry: dict) -> None:
 
 
 def assistant_page() -> None:
-    st.html('<div class="bc bc-card"><div class="bc-ph"><span>BOGCL AI assistant</span></div>'
-            '<div style="font-size:15px;line-height:1.5">Ask about vessels, voyages, berths, tanks, cargo operations, delays, alerts and KPIs. '
-            'Every answer comes from the operations data and shows the SQL behind it.</div></div>')
+    """Responsive AI assistant page with mode-aware BOGCL branding."""
+    import base64
+    from pathlib import Path
+
+    # Embed the supplied artwork so the page works reliably on Streamlit Cloud.
+    _art_path = Path(__file__).with_name("assets") / "bogcl_ai.png"
+    try:
+        _art = base64.b64encode(_art_path.read_bytes()).decode("ascii")
+    except OSError:
+        _art = ""
+    _art_uri = f"data:image/png;base64,{_art}"
+
+    st.html(f"""
+    <style>
+      .st-key-assistant_page {{
+        position: relative;
+        isolation: isolate;
+        min-height: 72vh;
+        padding: clamp(12px, 2.2vw, 28px) clamp(8px, 1.6vw, 20px) 24px;
+        border-radius: 22px;
+        overflow: hidden;
+        background: transparent;
+      }}
+      .st-key-assistant_page::before {{
+        content: "";
+        position: absolute;
+        z-index: -1;
+        pointer-events: none;
+        inset: 0;
+        background-image: url("__ART_URI__");
+        background-repeat: no-repeat;
+        background-position: center 230px;
+        background-size: min(74vw, 780px) auto;
+        opacity: .055;
+        filter: saturate(.8);
+      }}
+      .bc-ai-hero {{
+        text-align: center;
+        max-width: 900px;
+        margin: 0 auto 22px;
+        padding: 4px 12px 16px;
+      }}
+      .bc-ai-hero img {{
+        display: block;
+        width: min(100%, 370px);
+        height: auto;
+        margin: 0 auto 14px;
+        border-radius: 12px;
+        filter: drop-shadow(0 8px 20px rgba(10,55,100,.12));
+      }}
+      .bc-ai-eyebrow {{
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: .14em;
+        font-size: 11px;
+        font-weight: 800;
+        margin-bottom: 7px;
+      }}
+      .bc-ai-title {{
+        color: var(--text);
+        font-size: clamp(25px, 3vw, 36px);
+        font-weight: 850;
+        line-height: 1.14;
+        margin: 0 0 10px;
+      }}
+      .bc-ai-description {{
+        color: var(--muted);
+        font-size: clamp(14px, 1.25vw, 16px);
+        line-height: 1.65;
+        max-width: 760px;
+        margin: 0 auto;
+      }}
+      .bc-ai-section-label {{
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+        margin: 4px 0 10px;
+      }}
+      .st-key-assistant_page [data-testid="stChatMessage"] {{
+        max-width: 100%;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 5px 20px rgba(5,30,60,.06);
+        padding: 14px 16px;
+      }}
+      .st-key-assistant_page .stButton > button {{
+        white-space: normal;
+        min-height: 48px;
+        height: auto;
+        text-align: left;
+        line-height: 1.35;
+        padding: 10px 13px;
+        background: var(--card) !important;
+        border-color: var(--border) !important;
+        box-shadow: 0 3px 12px rgba(5,30,60,.045);
+        transition: border-color .16s ease, transform .16s ease, box-shadow .16s ease;
+      }}
+      .st-key-assistant_page .stButton > button:hover {{
+        transform: translateY(-1px);
+        border-color: var(--accent) !important;
+        box-shadow: 0 7px 18px rgba(5,30,60,.09);
+      }}
+      .st-key-assistant_page [data-testid="stChatInput"] {{ max-width: 100%; }}
+      @media (max-width: 700px) {{
+        .st-key-assistant_page {{ padding: 8px 2px 18px; border-radius: 14px; }}
+        .st-key-assistant_page::before {{
+          background-position: center 190px;
+          background-size: 115vw auto;
+          opacity: .04;
+        }}
+        .bc-ai-hero {{ margin-bottom: 14px; padding-bottom: 8px; }}
+        .bc-ai-hero img {{ width: min(88%, 300px); margin-bottom: 10px; }}
+      }}
+    </style>
+    """.replace("__ART_URI__", _art_uri))
+
     ss = st.session_state
     ss.setdefault("chat", [])
     ss.setdefault("conversation_id", None)
     ss.setdefault("question_count", 0)
 
-    if not ss.chat and "pending" not in ss:
-        cols = st.columns(3)
-        for i, qn in enumerate(EXAMPLE_QUESTIONS):
-            if cols[i % 3].button(qn, key=f"ex{i}", width="stretch"):
-                ss["pending"] = qn
-                st.rerun()
+    with st.container(key="assistant_page"):
+        st.html(f"""
+        <section class="bc-ai-hero">
+          <img src="{_art_uri}" alt="BOGCL AI Assistant marine operations banner" />
+          <div class="bc-ai-eyebrow">Marine operations intelligence</div>
+          <h1 class="bc-ai-title">BOGCL AI Assistant</h1>
+          <p class="bc-ai-description">This Agent provides real-time and historical insights into marine operations, including vessel movements, cargo handling, berth and bay status, and operational performance across ports.</p>
+        </section>
+        """)
 
-    for entry in ss.chat:
+        if not ss.chat and "pending" not in ss:
+            st.html('<div class="bc-ai-section-label">Suggested questions</div>')
+            cols = st.columns(3, gap="small")
+            for i, qn in enumerate(EXAMPLE_QUESTIONS):
+                if cols[i % 3].button(qn, key=f"ex{i}", width="stretch"):
+                    ss["pending"] = qn
+                    st.rerun()
+
+        for entry in ss.chat:
+            render_entry(entry)
+
+        if ss.chat and st.button("Start a new conversation", key="assistant_new_chat"):
+            ss.chat, ss.conversation_id = [], None
+            st.rerun()
+
+        typed = st.chat_input("Ask about vessels, voyages, cargo, berths, delays or alerts…",
+                              max_chars=MAX_QUESTION_CHARS)
+        prompt = ss.pop("pending", None) or typed
+        if not prompt:
+            return
+        if ss.question_count >= MAX_QUESTIONS_PER_SESSION:
+            st.html(C.note(f"This session reached the limit of {MAX_QUESTIONS_PER_SESSION} questions. Refresh the page to start again.", "warn"))
+            return
+        ss.question_count += 1
+        user_entry = {"role": "user", "text": [prompt]}
+        ss.chat.append(user_entry)
+        render_entry(user_entry)
+        with st.chat_message("assistant"):
+            with st.spinner("Analysing marine operations…"):
+                result = genie_client.ask(prompt, ss.conversation_id)
+        ss.conversation_id = result["conversation_id"] or ss.conversation_id
+        entry = {"role": "assistant", **result}
+        ss.chat.append(entry)
         render_entry(entry)
-    if ss.chat and st.button("Start a new conversation"):
-        ss.chat, ss.conversation_id = [], None
-        st.rerun()
-
-    typed = st.chat_input("Ask a question about BOGCL operations", max_chars=MAX_QUESTION_CHARS)
-    prompt = ss.pop("pending", None) or typed
-    if not prompt:
-        return
-    if ss.question_count >= MAX_QUESTIONS_PER_SESSION:
-        st.html(C.note(f"This session reached the limit of {MAX_QUESTIONS_PER_SESSION} questions. Refresh the page to start again.", "warn"))
-        return
-    ss.question_count += 1
-    user_entry = {"role": "user", "text": [prompt]}
-    ss.chat.append(user_entry)
-    render_entry(user_entry)
-    with st.chat_message("assistant"):
-        with st.spinner("Analysing the data..."):
-            result = genie_client.ask(prompt, ss.conversation_id)
-    ss.conversation_id = result["conversation_id"] or ss.conversation_id
-    entry = {"role": "assistant", **result}
-    ss.chat.append(entry)
-    render_entry(entry)
