@@ -184,7 +184,7 @@ def overview_page() -> None:
 
     k, al, head = load(data.kpis), load(data.alerts, 25), load(data.header)
     clock = "" if head is None or head.empty else head.iloc[0].clock
-    st.html('<div class="bc bc-cq"><div class="bc-grid bc-r4">' + C.exec_kpi_card(k, clock) + C.trend_card(k, st.session_state.get("mode", "Default")) + C.alerts_card(al) + "</div></div>")
+    st.html('<div class="bc bc-cq"><div class="bc-grid bc-r4">' + C.exec_kpi_card(k, clock) + C.executive_fleet_insight_card(vdf) + C.alerts_card(al) + "</div></div>")
     footer()
 
 
