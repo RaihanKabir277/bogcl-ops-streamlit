@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import hmac
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
@@ -74,24 +76,81 @@ def selected_vessel() -> str | None:
 
 
 # --------------------------------------------------------------------------- top bar
+@st.fragment(run_every="1s")
+def _live_date_chip() -> None:
+    """Render the actual Bangladesh calendar date, refreshed independently each second."""
+    now = datetime.now(ZoneInfo("Asia/Dhaka"))
+    today = now.strftime("%d %b %Y").lstrip("0")
+    st.html(C.header_chip("calendar", C.esc(today)))
+
+
+@st.fragment(run_every="1s")
+def _live_clock_chip() -> None:
+    """Render the actual Bangladesh wall clock, ticking without a full-page rerun."""
+    now = datetime.now(ZoneInfo("Asia/Dhaka"))
+    clock = now.strftime("%I:%M %p").lstrip("0")
+    st.html(C.header_chip("clock", f'{C.esc(clock)} <span class="bc-dim">(GMT+6)</span>'))
+
+
+def _header_responsive_css() -> None:
+    st.html("""<style>
+      [data-testid="stRadio"] [role="radiogroup"] {
+        display:flex; flex-wrap:nowrap !important; align-items:center; gap:clamp(3px, .5vw, 8px);
+      }
+      [data-testid="stRadio"] label { white-space:nowrap !important; min-width:max-content; }
+      [data-testid="stSelectbox"], [data-testid="stButton"] { position:relative; z-index:2; min-width:0; }
+      .st-key-refresh_dashboard button { white-space:nowrap; }
+    </style>""")
+
+
 def header(vdf: pd.DataFrame | None) -> None:
+    _header_responsive_css()
     head = load(data.header)
-    c_brand, c_vessel, c_mode, c_btn = st.columns([6.0, 2.1, 2.5, 1.1], vertical_alignment="center", gap="small")
+    if head is not None and not head.empty:
+        alerts_count = int(head.iloc[0].open_alerts)
+    else:
+        alerts_count = 0
+
+    # Keep the original brand/chip styling, but split information and controls into
+    # two rows. The old single row squeezed the radio labels into vertical letters
+    # and allowed the wide brand HTML to overlap the widgets at full-screen widths.
+    info_cols = st.columns([2.45, 0.9, 1.15, 1.0],
+                           vertical_alignment="center", gap="small")
+    c_brand, c_date, c_clock, c_alerts = info_cols
     with c_brand:
-        if head is not None and not head.empty:
-            h = head.iloc[0]
-            st.html(C.head_html(h.today, h.clock, int(h.open_alerts)))
+        st.html(C.head_brand_html())
+    with c_date:
+        _live_date_chip()
+    with c_clock:
+        _live_clock_chip()
+    with c_alerts:
+        tone = "bad" if alerts_count else "ok"
+        st.html(C.header_chip("alert", f'Alerts ({alerts_count})', tone,
+                              "Critical and warning alerts in the last 24 hours"))
+
+    control_cols = st.columns([1.45, 2.0, 0.8],
+                              vertical_alignment="center", gap="small")
+    c_vessel, c_mode, c_refresh = control_cols
     with c_vessel:
-        names = [ALL] + (vdf.vessel_name.tolist() if vdf is not None and not vdf.empty else [])
-        if st.session_state.get("vessel") not in names:
+        names = [ALL]
+        if vdf is not None and not vdf.empty and "vessel_name" in vdf.columns:
+            names += sorted(vdf["vessel_name"].dropna().astype(str).unique().tolist())
+        if st.session_state.get("vessel", ALL) not in names:
             st.session_state["vessel"] = ALL
-        st.selectbox("Vessel", names, key="vessel", label_visibility="collapsed")
+        st.selectbox("Vessel", names, key="vessel", label_visibility="collapsed",
+                     help="Filter vessel positions and voyage details.")
+
     with c_mode:
-        st.radio("Display mode", theme.MODES, horizontal=True, key="mode", label_visibility="collapsed")
-    with c_btn:
-        if st.button("Refresh", width="stretch"):
-            st.cache_data.clear()
-            st.rerun()
+        st.radio("Display mode", theme.MODES, horizontal=True, key="mode",
+                 label_visibility="collapsed", help="Switch the dashboard between Default, Dark, and Light.")
+
+    def refresh_dashboard() -> None:
+        # Clearing the cache in the callback makes the following automatic rerun fresh.
+        st.cache_data.clear()
+
+    with c_refresh:
+        st.button("Refresh", key="refresh_dashboard", on_click=refresh_dashboard,
+                  width="stretch", help="Clear cached data and reload the dashboard.")
 
 
 def footer() -> None:
@@ -137,7 +196,7 @@ def overview_page() -> None:
 
     k, al, head = load(data.kpis), load(data.alerts, 25), load(data.header)
     clock = "" if head is None or head.empty else head.iloc[0].clock
-    st.html('<div class="bc bc-cq"><div class="bc-grid bc-r4">' + C.exec_kpi_card(k, clock) + C.trend_card(k) + C.alerts_card(al) + "</div></div>")
+    st.html('<div class="bc bc-cq"><div class="bc-grid bc-r4">' + C.exec_kpi_card(k, clock) + C.executive_fleet_insight_card(vdf) + C.alerts_card(al) + "</div></div>")
     footer()
 
 
@@ -217,7 +276,7 @@ def assistant_page() -> None:
         _art = base64.b64encode(_art_path.read_bytes()).decode("ascii")
     except OSError:
         _art = ""
-    _art_uri = f"data:image/png;base64,{_art}"
+    _art_uri = f"data:image/png;base64,{_art}" if _art else ""
 
     st.html(f"""
     <style>
