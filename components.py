@@ -227,7 +227,7 @@ def fleet_ops_card(vdf: pd.DataFrame, selected: str | None, list_height: int = 3
                 td(r.to_port), td(r.eta_local if isinstance(r.eta_local, str) else "–"),
                 td(f"{n1(r.speed_kn)} kn", "n")], selected=(r.vessel_name == selected)) for r in d.itertuples()]
     tbl = table([("Vessel", ""), ("Status", ""), ("From", ""), ("To", ""), ("ETA (GMT+6)", ""), ("Speed", "n")], rows, list_height)
-    return (f'<div class="bc bc-card" style="min-height:560px"><div class="bc-ph"><span>Fleet operations</span></div>{tiles}'
+    return (f'<div class="bc bc-card bc-card-fleet" style="min-height:560px"><div class="bc-ph"><span>Fleet operations</span></div>{tiles}'
             f'<div class="bc-ph" style="margin:16px 0 8px"><span>Active vessel list</span></div>{tbl}</div>')
 
 
@@ -296,7 +296,7 @@ def terminal_card(berths: pd.DataFrame | None, bays: pd.DataFrame | None, ta: pd
                      f'<div class="bc-v" style="margin:34px 0 0">{val}</div>'
                      f'<div class="bc-s" style="margin-top:34px">{int(t.vessels_handled_7d)} discharges completed, last 7 days</div></div></div>')
     tbl = berth_table(berths, compact=compact) if berths is not None and not berths.empty else ""
-    return (f'<div class="bc bc-card"><div class="bc-ph"><span>Terminal operations</span></div>'
+    return (f'<div class="bc bc-card bc-card-terminal"><div class="bc-ph"><span>Terminal operations</span></div>'
             f'<div class="bc-tiles bc-t3">{"".join(tiles)}</div>'
             f'<div class="bc-ph" style="margin:16px 0 8px"><span>Berth and status</span></div>{tbl}</div>')
 
@@ -368,7 +368,7 @@ def cargo_card(ops: pd.DataFrame | None, tanks: pd.DataFrame | None, today_mt, s
           f'<div style="margin-top:6px">{pill("All normal" if status == "Normal" else "Attention", sys_tone)}</div>'
           f'<div class="bc-s" style="margin-top:8px;white-space:normal">{"no critical alert in the last 2 h" if status == "Normal" else "critical alert in the last 2 h"}</div></div>')
     bars = tank_bars(tanks) if tanks is not None and not tanks.empty else ""
-    return (f'<div class="bc bc-card"><div class="bc-ph"><span>Cargo operations</span></div>'
+    return (f'<div class="bc bc-card bc-card-cargo"><div class="bc-ph"><span>Cargo operations</span></div>'
             f'<div class="bc-tiles bc-t4">{t1}{t2}{t3}{t4}</div>'
             f'<div class="bc-ph" style="margin:16px 0 8px"><span>Tank levels overview</span></div>{bars}'
             f'<div class="bc-ph" style="margin:18px 0 8px"><span>Active cargo operations</span></div>{ops_table(ops, selected)}</div>')
@@ -417,7 +417,7 @@ def exec_kpi_card(k: pd.DataFrame | None, clock: str = "") -> str:
              + total("Critical alerts", "critical_alerts", "", n0, "var(--bad)"))
     foot = (f'Today is a partial day{f" (as of {esc(clock)})" if clock else ""}. Cargo, delay, fuel and alert totals build up through the day, '
             f'so they sit beside yesterday\'s full-day figure instead of showing a percentage change.')
-    return (f'<div class="bc bc-card"><div class="bc-ph"><span>Executive KPIs</span><span class="bc-sub">today</span></div>'
+    return (f'<div class="bc bc-card bc-card-executive"><div class="bc-ph"><span>Executive KPIs</span><span class="bc-sub">today</span></div>'
             f'<div class="bc-tiles bc-t2">{tiles}</div><div class="bc-foot">{foot}</div></div>')
 
 
@@ -509,7 +509,7 @@ def trend_card(k: pd.DataFrame | None, mode: str = "Default") -> str:
     legend = (f'<div class="bc-legend"><span><i style="background:{fleet_color}"></i>Fleet utilisation (%)</span>'
               f'<span><i style="background:{ontime_color}"></i>On-time delivery (%)</span>'
               f'<span><i style="background:{delay_color}"></i>Operational delays (hrs, right axis)</span></div>')
-    return (f'<div class="bc bc-card"><div class="bc-ph"><span>KPI trend</span><span class="bc-sub">last 7 days</span></div>{legend}{svg}'
+    return (f'<div class="bc bc-card bc-card-trend"><div class="bc-ph"><span>KPI trend</span><span class="bc-sub">last 7 days</span></div>{legend}{svg}'
             '<div class="bc-foot">Hover over a point for its value. Percentages use the left axis; delay hours use the right axis.</div></div>')
 
 
@@ -527,7 +527,7 @@ def alerts_card(al: pd.DataFrame | None, limit: int = 7, height: int = 420) -> s
                  f'<div class="bc-al-s">{esc(r.asset_name)}</div></div><div class="bc-al-w">{esc(ago(r.minutes_ago))}</div></div>'
                  for r in al.head(limit).itertuples()]
         body = f'<div class="bc-scroll" style="max-height:{height}px">{"".join(items)}</div>'
-    return f'<div class="bc bc-card"><div class="bc-ph"><span>Latest alerts</span></div>{body}</div>'
+    return f'<div class="bc bc-card bc-card-alerts"><div class="bc-ph"><span>Latest alerts</span></div>{body}</div>'
 
 
 def alerts_table_card(al: pd.DataFrame | None) -> str:
