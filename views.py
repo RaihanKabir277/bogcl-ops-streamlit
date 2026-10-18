@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import hmac
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
@@ -74,13 +76,28 @@ def selected_vessel() -> str | None:
 
 
 # --------------------------------------------------------------------------- top bar
+@st.fragment(run_every="1s")
+def _live_date_chip() -> None:
+    """Render the actual Bangladesh calendar date, refreshed independently each second."""
+    now = datetime.now(ZoneInfo("Asia/Dhaka"))
+    today = now.strftime("%d %b %Y").lstrip("0")
+    st.html(C.header_chip("calendar", C.esc(today)))
+
+
+@st.fragment(run_every="1s")
+def _live_clock_chip() -> None:
+    """Render the actual Bangladesh wall clock, ticking without a full-page rerun."""
+    now = datetime.now(ZoneInfo("Asia/Dhaka"))
+    clock = now.strftime("%I:%M %p").lstrip("0")
+    st.html(C.header_chip("clock", f'{C.esc(clock)} <span class="bc-dim">(GMT+6)</span>'))
+
+
 def header(vdf: pd.DataFrame | None) -> None:
     head = load(data.header)
     if head is not None and not head.empty:
-        h = head.iloc[0]
-        today, clock, alerts_count = str(h.today), str(h.clock), int(h.open_alerts)
+        alerts_count = int(head.iloc[0].open_alerts)
     else:
-        today, clock, alerts_count = "Date unavailable", "Time unavailable", 0
+        alerts_count = 0
 
     # Keep the original brand/chip styling, but split information and controls into
     # two rows. The old single row squeezed the radio labels into vertical letters
@@ -91,9 +108,9 @@ def header(vdf: pd.DataFrame | None) -> None:
     with c_brand:
         st.html(C.head_brand_html())
     with c_date:
-        st.html(C.header_chip("calendar", C.esc(today)))
+        _live_date_chip()
     with c_clock:
-        st.html(C.header_chip("clock", f'{C.esc(clock)} <span class="bc-dim">(GMT+6)</span>'))
+        _live_clock_chip()
     with c_alerts:
         tone = "bad" if alerts_count else "ok"
         st.html(C.header_chip("alert", f'Alerts ({alerts_count})', tone,
