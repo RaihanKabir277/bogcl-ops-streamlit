@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import html
 import math
-
+import base64
+from pathlib import Path
 import pandas as pd
 
 STATUS_TONE = {"En Route": "good", "At Anchor": "warn", "At Port": "info"}
@@ -150,10 +151,27 @@ def td(content: str, cls: str = "", raw: bool = False) -> str:
     return f'<td class="{cls}">{content if raw else esc(content)}</td>'
 
 
+def bogcl_logo_html() -> str:
+    """Embed the local BOGCL logo so it works inside the HTML header."""
+    logo_path = Path(__file__).parent / "assets" / "bogcl_mark.png"
+
+    if not logo_path.exists():
+        return ico("compass", 24)
+
+    encoded = base64.b64encode(logo_path.read_bytes()).decode("ascii")
+
+    return (
+        f'<img src="data:image/png;base64,{encoded}" '
+        'alt="BOGCL logo" '
+        'style="width:42px;height:42px;object-fit:contain;'
+        'display:block;background:#ffffff;border-radius:9px;padding:3px;">'
+    )
+
+
 # --------------------------------------------------------------------------- top bar
 def head_html(today: str, clock: str, open_alerts: int) -> str:
     chip_cls = "bad" if open_alerts else "ok"
-    return (f'<div class="bc bc-head"><div class="bc-brand"><div class="bc-logo">{ico("compass", 24)}</div><div>'
+    return (f'<div class="bc bc-head"><div class="bc-brand"><div class="bc-logo">{bogcl_logo_html()}</div></div><div>'
             f'<div class="bc-title">BOGCL Marine Operations</div><div class="bc-tag">Real-time vessel and terminal monitoring</div></div></div>'
             f'<span class="bc-chip">{ico("calendar")}{esc(today)}</span>'
             f'<span class="bc-chip">{ico("clock")}{esc(clock)} <span class="bc-dim">(GMT+6)</span></span>'
