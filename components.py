@@ -180,7 +180,7 @@ def head_html(today: str, clock: str, open_alerts: int) -> str:
 
 def head_brand_html() -> str:
     """The original brand block, rendered in its own column to prevent overlap with widgets."""
-    return (f'<div class="bc bc-head"><div class="bc-brand"><div class="bc-logo">{ico("compass", 24)}</div><div>'
+    return (f'<div class="bc bc-head"><div class="bc-brand"><div class="bc-logo">{bogcl_logo_html()}</div><div>'
             f'<div class="bc-title">BOGCL Marine Operations</div><div class="bc-tag">Real-time vessel and terminal monitoring</div></div></div></div>')
 
 
