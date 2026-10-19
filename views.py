@@ -94,35 +94,3 @@ def _live_clock_chip() -> None:
 
 
 def _header_responsive_css() -> None:
-    st.html("""<style>
-      [data-testid="stRadio"] [role="radiogroup"] {
-        display:flex; flex-wrap:nowrap !important; align-items:center; gap:clamp(3px, .5vw, 8px);
-      }
-      [data-testid="stRadio"] label { white-space:nowrap !important; min-width:max-content; }
-      [data-testid="stSelectbox"], [data-testid="stButton"] { position:relative; z-index:2; min-width:0; }
-      .st-key-refresh_dashboard button { white-space:nowrap; }
-    </style>""")
-
-
-def header(vdf: pd.DataFrame | None) -> None:
-    _header_responsive_css()
-    head = load(data.header)
-    if head is not None and not head.empty:
-        alerts_count = int(head.iloc[0].open_alerts)
-    else:
-        alerts_count = 0
-
-    # Keep the original brand/chip styling, but split information and controls into
-    # two rows. The old single row squeezed the radio labels into vertical letters
-    # and allowed the wide brand HTML to overlap the widgets at full-screen widths.
-    info_cols = st.columns([2.45, 0.9, 1.15, 1.0],
-                           vertical_alignment="center", gap="small")
-    c_brand, c_date, c_clock, c_alerts = info_cols
-    with c_brand:
-        st.html(C.head_brand_html())
-    with c_date:
-        _live_date_chip()
-    with c_clock:
-        _live_clock_chip()
-    with c_alerts:
-        tone = "bad" if alerts_count else "ok"
