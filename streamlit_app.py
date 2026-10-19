@@ -20,6 +20,19 @@ views.password_gate()
 
 views.header(views.load(data.vessels))
 
+
+from pathlib import Path
+
+# Zylo company branding in the sidebar
+logo_path = Path(__file__).parent / "assets" / "zylo_logo.jpeg"
+
+if logo_path.exists():
+    with st.sidebar:
+        st.image(str(logo_path), width=140)
+        st.caption("Developed by Zylo")
+        st.divider()
+
+
 pages = [
     st.Page(views.overview_page, title="Overview", icon=":material/dashboard:", url_path="overview", default=True),
     st.Page(views.fleet_page, title="Fleet Operations", icon=":material/directions_boat:", url_path="fleet"),
