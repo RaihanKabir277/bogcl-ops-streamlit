@@ -448,11 +448,12 @@ def assistant_page() -> None:
 
     with st.container(key="assistant_page"):
         st.html(f"""
-        <section class="bc-ai-hero">
+          <section class="bc-ai-hero">
+          <img src="{_art_uri}" alt="BOGCL AI Assistant marine operations banner" />
           <div class="bc-ai-eyebrow">Marine operations intelligence</div>
           <h1 class="bc-ai-title">BOGCL AI Assistant</h1>
           <p class="bc-ai-description">This Agent provides real-time and historical insights into marine operations, including vessel movements, cargo handling, berth and bay status, and operational performance across ports.</p>
-        </section>
+          </section>
         """)
 
         if not ss.chat and "pending" not in ss:
