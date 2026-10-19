@@ -10,6 +10,9 @@ all switch together. Text colours are chosen for contrast: roughly 4.5:1 or bett
 """
 from __future__ import annotations
 
+import base64
+from pathlib import Path
+
 MODES = ["Default", "Dark", "Light"]
 
 DARK = {
@@ -63,6 +66,45 @@ def palettes_json() -> dict:
     return {"dark": {k: DARK[k] for k in keep}, "light": {k: LIGHT[k] for k in keep}}
 
 
+def sidebar_watermark_css(mode: str = "Default") -> str:
+    """Return CSS for a subtle refinery-image watermark in the sidebar only."""
+    image_path = (
+        Path(__file__).parent
+        / "assets"
+        / "sidebar_watermark.jpg"
+    )
+
+    if not image_path.exists():
+        return ""
+
+    encoded = base64.b64encode(
+        image_path.read_bytes()
+    ).decode("ascii")
+
+    # Keep the image subtle and readable in each dashboard theme.
+    if mode == "Dark":
+        overlay = "rgba(8, 22, 41, 0.88)"
+    else:
+        overlay = "rgba(255, 255, 255, 0.90)"
+
+    return f"""
+    <style>
+    [data-testid="stSidebar"] > div:first-child {{
+        background-image:
+            linear-gradient(
+                {overlay},
+                {overlay}
+            ),
+            url("data:image/jpeg;base64,{encoded}") !important;
+        background-position: center center;
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-attachment: local;
+    }}
+    </style>
+    """
+
+
 BASE_CSS = """
 /* ===== Streamlit chrome ===== */
 .stApp{background:var(--page-bg)!important;background-attachment:fixed!important;color:var(--text)}
@@ -96,8 +138,8 @@ BASE_CSS = """
 [data-baseweb="popover"] li:hover,[data-baseweb="popover"] li[aria-selected="true"]{background:var(--hover)!important}
 
 /* mode switch (radio shown as pills) and buttons */
-[data-testid="stRadio"]{min-width:0;overflow:visible}[data-testid="stRadio"] [role="radiogroup"]{gap:.35rem;flex-wrap:nowrap;min-width:max-content;overflow:visible}
-[data-testid="stRadio"] label{border:1px solid var(--border);background:var(--field);border-radius:999px;padding:.18rem .65rem;margin:0;white-space:nowrap;flex-shrink:0;min-width:max-content}
+[data-testid="stRadio"] [role="radiogroup"]{gap:.35rem;flex-wrap:nowrap}
+[data-testid="stRadio"] label{border:1px solid var(--border);background:var(--field);border-radius:999px;padding:.18rem .8rem;margin:0}
 [data-testid="stRadio"] label *{color:var(--text)!important;font-weight:600}
 [data-testid="stRadio"] label:has(input:checked){background:var(--accent);border-color:var(--accent)}
 [data-testid="stRadio"] label:has(input:checked) *{color:var(--on-accent)!important}
@@ -105,16 +147,6 @@ BASE_CSS = """
 .stButton>button *{color:var(--text)!important}
 .stButton>button:hover{border-color:var(--accent)!important}
 .stButton>button:hover *{color:var(--accent)!important}
-[data-testid="stButton"] button,[data-testid="stButton"] button:focus,[data-testid="stButton"] button:active{
-  background:var(--field)!important;background-color:var(--field)!important;background-image:none!important;
-  color:var(--text)!important;-webkit-text-fill-color:var(--text)!important;border-color:var(--border)!important;
-}
-[data-testid="stButton"] button span,[data-testid="stButton"] button p,[data-testid="stButton"] button div{
-  color:var(--text)!important;-webkit-text-fill-color:var(--text)!important;
-}
-[data-testid="stButton"] button:hover span,[data-testid="stButton"] button:hover p,[data-testid="stButton"] button:hover div{
-  color:var(--accent)!important;-webkit-text-fill-color:var(--accent)!important;
-}
 
 /* text + chat inputs */
 [data-baseweb="input"],[data-baseweb="base-input"]{background:var(--field)!important;border-color:var(--border)!important}
@@ -236,90 +268,4 @@ table.bc-t{width:100%;border-collapse:collapse;font-size:13px;color:var(--text)}
 .bc-sql{margin-top:8px}
 .bc-sql summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:13px}
 .bc-sql pre{margin:8px 0 0;padding:12px 14px;border-radius:10px;background:var(--card-solid);border:1px solid var(--border);color:var(--text);font-size:12.5px;line-height:1.5;overflow:auto;white-space:pre-wrap}
-
-/* Responsive top-bar controls: keep mode names on one line and preserve usable hit areas. */
-@media (max-width: 1050px) {
-  [data-testid="stMainBlockContainer"]{padding-left:1rem!important;padding-right:1rem!important}
-  [data-testid="stRadio"] label{padding:.18rem .45rem}
-  .bc-chip{padding:7px 9px;font-size:12px}
-  .bc-title{font-size:18px}
-}
-@media (max-width: 760px) {
-  [data-testid="stRadio"] label{padding:.18rem .4rem;font-size:12px}
-  [data-testid="stRadio"] [role="radiogroup"]{gap:.2rem}
-  .bc-chip{white-space:normal;overflow-wrap:anywhere}
-}
-
-
-
-/* ===== Purposeful enterprise card finishes (visual-only; no layout changes) ===== */
-.bc-card{
-  --card-accent:var(--accent);
-  position:relative;
-  border-top:3px solid color-mix(in srgb,var(--card-accent) 76%,var(--border))!important;
-  background:linear-gradient(138deg,color-mix(in srgb,var(--card-accent) 7%,var(--card)) 0%,var(--card) 48%,color-mix(in srgb,var(--card-accent) 3%,var(--card)) 100%)!important;
-  box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.16);
-  transition:border-color .18s ease,box-shadow .18s ease;
-}
-.bc-card:hover{box-shadow:var(--shadow),0 0 0 1px color-mix(in srgb,var(--card-accent) 15%,transparent)}
-.bc-card-fleet{--card-accent:var(--info)}
-.bc-card-terminal{--card-accent:var(--accent-2)}
-.bc-card-cargo{--card-accent:var(--good)}
-.bc-card-executive{--card-accent:var(--accent)}
-.bc-card-insights{--card-accent:#7C6EE6}
-.bc-card-alerts{--card-accent:var(--warn)}
-.bc-card:has(.bc-t){--card-accent:var(--info)}
-.bc-card:has(.bc-al){--card-accent:var(--warn)}
-.bc-card-fleet:has(.bc-t){--card-accent:var(--info)}
-
-/* Metric tiles use restrained semantic washes and a fine accent edge. */
-.bc-tile{
-  --tile-accent:var(--accent);
-  background:linear-gradient(135deg,color-mix(in srgb,var(--tile-accent) 8%,var(--tile)) 0%,var(--tile) 78%)!important;
-  border:1px solid color-mix(in srgb,var(--tile-accent) 18%,var(--line))!important;
-  border-left:3px solid color-mix(in srgb,var(--tile-accent) 72%,var(--line))!important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.12);
-  transition:background .18s ease,border-color .18s ease,transform .18s ease;
-}
-.bc-tile:hover{border-color:color-mix(in srgb,var(--tile-accent) 34%,var(--line))!important}
-
-/* Overview: Live positions, voyages, anchorage and ETA */
-.bc-card-fleet > .bc-tiles .bc-tile:nth-child(1){--tile-accent:var(--info)}
-.bc-card-fleet > .bc-tiles .bc-tile:nth-child(2){--tile-accent:var(--good)}
-.bc-card-fleet > .bc-tiles .bc-tile:nth-child(3){--tile-accent:var(--warn)}
-.bc-card-fleet > .bc-tiles .bc-tile:nth-child(4){--tile-accent:var(--accent-2)}
-.bc-strip .bc-tile:nth-child(1){--tile-accent:var(--info)}
-.bc-strip .bc-tile:nth-child(2){--tile-accent:var(--accent-2)}
-.bc-strip .bc-tile:nth-child(3){--tile-accent:var(--warn)}
-.bc-strip .bc-tile:nth-child(4){--tile-accent:var(--info)}
-.bc-strip .bc-tile:nth-child(5){--tile-accent:var(--good)}
-.bc-strip .bc-tile:nth-child(6){--tile-accent:var(--accent)}
-.bc-strip .bc-tile:nth-child(7){--tile-accent:var(--warn)}
-
-/* Terminal: berth occupancy, loading bay utilisation, turnaround */
-.bc-card-terminal .bc-tile:nth-child(1){--tile-accent:var(--good)}
-.bc-card-terminal .bc-tile:nth-child(2){--tile-accent:var(--info)}
-.bc-card-terminal .bc-tile:nth-child(3){--tile-accent:var(--warn)}
-
-/* Cargo: handling progress, transferred quantity, tank level and system health */
-.bc-card-cargo .bc-tile:nth-child(1){--tile-accent:var(--good)}
-.bc-card-cargo .bc-tile:nth-child(2){--tile-accent:var(--info)}
-.bc-card-cargo .bc-tile:nth-child(3){--tile-accent:var(--accent-2)}
-.bc-card-cargo .bc-tile:nth-child(4){--tile-accent:var(--warn)}
-
-/* Executive KPI tiles: each metric has a meaningful, consistent signal color. */
-.bc-card-executive .bc-tile:nth-child(1){--tile-accent:var(--good)}
-.bc-card-executive .bc-tile:nth-child(2){--tile-accent:var(--info)}
-.bc-card-executive .bc-tile:nth-child(3){--tile-accent:var(--accent-2)}
-.bc-card-executive .bc-tile:nth-child(4){--tile-accent:var(--warn)}
-.bc-card-executive .bc-tile:nth-child(5){--tile-accent:var(--accent)}
-.bc-card-executive .bc-tile:nth-child(6){--tile-accent:var(--bad)}
-
-/* Tables, alerts and insight sections retain their current geometry and spacing. */
-.bc-card .bc-t th{background:color-mix(in srgb,var(--card-accent) 5%,var(--card-solid))!important}
-.bc-card-alerts .bc-al{border-bottom-color:color-mix(in srgb,var(--warn) 18%,var(--line))}
-.bc-card-alerts .bc-al-ic{box-shadow:0 0 0 3px color-mix(in srgb,var(--warn) 8%,transparent)}
-.bc-card-insights .bc-ph{color:color-mix(in srgb,var(--card-accent) 78%,var(--muted))}
-@media (prefers-reduced-motion:reduce){.bc-card,.bc-tile{transition:none}}
-
 """
