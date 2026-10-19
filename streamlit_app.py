@@ -9,12 +9,14 @@ import streamlit as st
 
 import data
 import views
+import theme
 
 st.set_page_config(page_title="BOGCL Marine Operations", page_icon=":ship:", layout="wide",
                    initial_sidebar_state="expanded")
 
 # The colour mode lives in session state (set by the radio in the top bar), so it is known before the page is drawn.
 views.inject_css(st.session_state.get("mode", "Default"))
+st.html(theme.sidebar_watermark_css(st.session_state.get("mode", "Default")))
 views.check_secrets()
 views.password_gate()
 
