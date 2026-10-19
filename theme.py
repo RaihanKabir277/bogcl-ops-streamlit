@@ -148,6 +148,40 @@ BASE_CSS = """
 .stButton>button:hover{border-color:var(--accent)!important}
 .stButton>button:hover *{color:var(--accent)!important}
 
+/* Force Streamlit buttons to use the active dashboard palette (including Refresh in Dark mode). */
+[data-testid="stButton"] > button,
+.stButton > button,
+button[kind="secondary"] {
+    background: var(--field, #112440) !important;
+    background-color: var(--field, #112440) !important;
+    color: var(--text, #EAF1FB) !important;
+    -webkit-text-fill-color: var(--text, #EAF1FB) !important;
+    border: 1px solid var(--border, rgba(140,175,225,.22)) !important;
+    opacity: 1 !important;
+}
+[data-testid="stButton"] > button p,
+[data-testid="stButton"] > button span,
+[data-testid="stButton"] > button div,
+.stButton > button p,
+.stButton > button span,
+.stButton > button div {
+    color: var(--text, #EAF1FB) !important;
+    -webkit-text-fill-color: var(--text, #EAF1FB) !important;
+    opacity: 1 !important;
+}
+[data-testid="stButton"] > button:hover,
+.stButton > button:hover,
+button[kind="secondary"]:hover {
+    border-color: var(--accent, #4DABFF) !important;
+}
+[data-testid="stButton"] > button:hover p,
+[data-testid="stButton"] > button:hover span,
+.stButton > button:hover p,
+.stButton > button:hover span {
+    color: var(--accent, #4DABFF) !important;
+    -webkit-text-fill-color: var(--accent, #4DABFF) !important;
+}
+
 /* text + chat inputs */
 [data-baseweb="input"],[data-baseweb="base-input"]{background:var(--field)!important;border-color:var(--border)!important}
 [data-testid="stTextInput"] input{background:var(--field)!important;color:var(--text)!important;-webkit-text-fill-color:var(--text)!important}
