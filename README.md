@@ -8,8 +8,9 @@
 
 ## Dashboard Preview
 
-![BOGCL Marine Operations dashboard](docs/dashboard-preview.png)
-
+![BOGCL Marine Operations dashboard](assets/dashbaord_preview.png)
+(assets/dashbaord_preview2.png)
+(assets/dashbaord_preview3.png)
 ## Overview
 
 BOGCL Marine Operations is a Streamlit dashboard that brings key marine operations views together in one interface.
